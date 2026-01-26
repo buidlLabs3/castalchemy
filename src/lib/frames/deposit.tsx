@@ -1,11 +1,9 @@
+/** @jsxImportSource frog/jsx */
 /**
  * Deposit Frame - Allows users to deposit into Alchemix vaults
  */
 
 import { Button, type FrameHandler } from 'frog';
-import { getAlchemixClient } from '@/lib/contracts/alchemix';
-import { formatError } from '@/lib/utils/errors';
-import type { VaultType } from '@/types';
 
 export const depositFrame: FrameHandler = async (c) => {
   const { buttonValue, inputText, status } = c;
@@ -42,9 +40,9 @@ export const depositFrame: FrameHandler = async (c) => {
         <Button key="aleth" value="aleth">
           alETH Vault
         </Button>,
-        <Button.redirect key="back" location="/api/frames">
+        <Button.Redirect key="back" location="/api/frames">
           Back
-        </Button.redirect>,
+        </Button.Redirect>,
       ],
     });
   }
@@ -89,41 +87,15 @@ export const depositFrame: FrameHandler = async (c) => {
         >
           Deposit
         </Button.Transaction>,
-        <Button.redirect key="back" location="/api/frames/deposit">
+        <Button.Redirect key="back" location="/api/frames/deposit">
           Back
-        </Button.redirect>,
+        </Button.Redirect>,
       ],
-      textInput: 'Enter amount',
     });
   }
 
-  // Transaction submitted
-  if (status === 'tx') {
-    return c.res({
-      image: (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-            height: '100%',
-            backgroundColor: '#1a1a1a',
-            color: '#ffffff',
-            padding: 40,
-          }}
-        >
-          <div style={{ fontSize: 36, fontWeight: 'bold', marginBottom: 20 }}>
-            ⏳ Processing...
-          </div>
-          <div style={{ fontSize: 20, color: '#888' }}>
-            Confirm the transaction in your wallet
-          </div>
-        </div>
-      ),
-    });
-  }
+  // Transaction submitted - handle in transaction route instead
+  // Status type doesn't include 'tx' in this version
 
   // Default back to initial
   return c.res({
@@ -156,9 +128,9 @@ export const depositFrame: FrameHandler = async (c) => {
       <Button key="aleth" value="aleth">
         alETH Vault
       </Button>,
-      <Button.redirect key="back" location="/api/frames">
+      <Button.Redirect key="back" location="/api/frames">
         Back
-      </Button.redirect>,
+      </Button.Redirect>,
     ],
   });
 };

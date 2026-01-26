@@ -3,7 +3,7 @@
  * Using audited contract ABIs for safe interactions
  */
 
-import { createPublicClient, http, type Address, type Chain } from 'viem';
+import { createPublicClient, http, encodeFunctionData, type Address, type Chain } from 'viem';
 import type { VaultType, Position } from '@/types';
 import { ALCHEMIX_V2_VAULTS, SUPPORTED_NETWORKS } from '@/lib/config/networks';
 import { CastAlchemyError, ERROR_CODES } from '@/lib/utils/errors';
@@ -66,7 +66,10 @@ export class AlchemixV2Client {
   private publicClient;
   private chain: Chain;
 
+  private chainId: number;
+
   constructor(chainId: number, rpcUrl: string) {
+    this.chainId = chainId;
     this.chain = {
       id: chainId,
       name: 'Custom',
@@ -82,6 +85,13 @@ export class AlchemixV2Client {
       chain: this.chain,
       transport: http(),
     });
+  }
+
+  /**
+   * Get the chain ID
+   */
+  getChainId(): number {
+    return this.chainId;
   }
 
   /**
@@ -153,7 +163,7 @@ export class AlchemixV2Client {
   /**
    * Prepare deposit transaction
    */
-  async prepareDeposit(vaultType: VaultType, amount: bigint, userAddress: Address) {
+  async prepareDeposit(vaultType: VaultType, amount: bigint, _userAddress: Address) {
     const vault = ALCHEMIX_V2_VAULTS[vaultType];
     if (!vault) {
       throw new CastAlchemyError(
@@ -182,7 +192,7 @@ export class AlchemixV2Client {
     try {
       return {
         to: vault.address as Address,
-        data: this.publicClient.encodeFunctionData({
+        data: encodeFunctionData({
           abi: VAULT_ABI,
           functionName: 'deposit',
           args: [amount],
@@ -201,7 +211,7 @@ export class AlchemixV2Client {
   /**
    * Prepare borrow transaction
    */
-  async prepareBorrow(vaultType: VaultType, amount: bigint, userAddress: Address) {
+  async prepareBorrow(vaultType: VaultType, amount: bigint, _userAddress: Address) {
     const vault = ALCHEMIX_V2_VAULTS[vaultType];
     if (!vault) {
       throw new CastAlchemyError(
@@ -230,7 +240,7 @@ export class AlchemixV2Client {
     try {
       return {
         to: vault.address as Address,
-        data: this.publicClient.encodeFunctionData({
+        data: encodeFunctionData({
           abi: VAULT_ABI,
           functionName: 'borrow',
           args: [amount],

@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const tx = await client.prepareDeposit(vaultType, amount, userAddress);
 
     return NextResponse.json({
-      chainId: `eip155:${client.chain.id}`,
+      chainId: `eip155:${client.getChainId()}`,
       method: 'eth_sendTransaction',
       params: {
         abi: [],

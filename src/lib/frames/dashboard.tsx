@@ -1,3 +1,4 @@
+/** @jsxImportSource frog/jsx */
 /**
  * Position Dashboard Frame - Shows user's Alchemix positions
  */
@@ -8,7 +9,7 @@ import { formatError } from '@/lib/utils/errors';
 import { formatAmount, formatHealthFactor } from '@/lib/utils/format';
 
 export const dashboardFrame: FrameHandler = async (c) => {
-  const { buttonValue, status, verified } = c;
+  const { verified } = c;
 
   // Check if user is verified (has connected wallet)
   if (!verified) {
@@ -39,9 +40,9 @@ export const dashboardFrame: FrameHandler = async (c) => {
         <Button key="connect" value="connect">
           Connect Wallet
         </Button>,
-        <Button.redirect key="back" location="/api/frames">
+        <Button.Redirect key="back" location="/api/frames">
           Back
-        </Button.redirect>,
+        </Button.Redirect>,
       ],
     });
   }
@@ -82,14 +83,14 @@ export const dashboardFrame: FrameHandler = async (c) => {
               📊 No Positions
             </div>
             <div style={{ fontSize: 20, color: '#888', textAlign: 'center' }}>
-              You don't have any active positions yet
+              You don&apos;t have any active positions yet
             </div>
           </div>
         ),
       intents: [
-        <Button.redirect key="deposit" location="/api/frames/deposit">
+        <Button.Redirect key="deposit" location="/api/frames/deposit">
           Deposit Now
-        </Button.redirect>,
+        </Button.Redirect>,
       ],
       });
     }
@@ -146,9 +147,9 @@ export const dashboardFrame: FrameHandler = async (c) => {
         <Button key="refresh" value="refresh">
           Refresh
         </Button>,
-        <Button.redirect key="deposit" location="/api/frames/deposit">
+        <Button.Redirect key="deposit" location="/api/frames/deposit">
           Deposit
-        </Button.redirect>,
+        </Button.Redirect>,
       ],
     });
   } catch (error) {
