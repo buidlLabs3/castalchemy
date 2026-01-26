@@ -75,3 +75,5 @@ Since local compilation is failing, consider:
 2. If that fails, try Solution 2 (full reinstall)
 3. If still failing, consider deploying to Vercel instead
 
+
+

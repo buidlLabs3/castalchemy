@@ -63,3 +63,5 @@ Some TypeScript errors may appear in the route files due to JSX usage with Frog 
 5. ⏳ Configure contract addresses in `.env.local`
 6. ⏳ Deploy to testnet
 
+
+

@@ -53,3 +53,5 @@ ps aux | grep "next dev"
 3. Check browser console for errors
 4. Check terminal for compilation errors
 
+
+

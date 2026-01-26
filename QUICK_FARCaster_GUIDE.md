@@ -112,3 +112,5 @@ For Farcaster to access your Frame, it must be publicly accessible:
 - Transaction failing? Verify contract addresses
 - See `FARCASTER_SETUP.md` for detailed guide
 
+
+

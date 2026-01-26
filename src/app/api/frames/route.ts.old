@@ -1,0 +1,107 @@
+/**
+ * Farcaster Frames API route
+ * Main entry point for all Frame interactions
+ */
+
+import { Frog } from 'frog';
+import { handle } from 'frog/next';
+import { NextRequest } from 'next/server';
+
+const app = new Frog({
+  hub: process.env.FARCASTER_HUB_URL || 'https://hubs.airstack.xyz',
+});
+
+// Main frame route
+app.frame('/', (c) => {
+  return c.res({
+    image: 'https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy',
+    intents: [
+      {
+        type: 'button',
+        label: 'Deposit',
+        action: {
+          type: 'post',
+          target: '/api/frames/deposit',
+        },
+      },
+      {
+        type: 'button',
+        label: 'My Positions',
+        action: {
+          type: 'post',
+          target: '/api/frames/dashboard',
+        },
+      },
+    ],
+  });
+});
+
+// Deposit frame route
+app.frame('/deposit', (c) => {
+  return c.res({
+    image: 'https://via.placeholder.com/600x400/1a1a1a/4ade80?text=Deposit+to+Alchemix',
+    intents: [
+      {
+        type: 'button',
+        label: 'alUSD Vault',
+        action: {
+          type: 'post',
+          target: '/api/frames/deposit?vault=alusd',
+        },
+      },
+      {
+        type: 'button',
+        label: 'alETH Vault',
+        action: {
+          type: 'post',
+          target: '/api/frames/deposit?vault=aleth',
+        },
+      },
+      {
+        type: 'button',
+        label: 'Back',
+        action: {
+          type: 'post',
+          target: '/api/frames',
+        },
+      },
+    ],
+  });
+});
+
+// Dashboard frame route
+app.frame('/dashboard', (c) => {
+  return c.res({
+    image: 'https://via.placeholder.com/600x400/1a1a1a/60a5fa?text=My+Positions',
+    intents: [
+      {
+        type: 'button',
+        label: 'Refresh',
+        action: {
+          type: 'post',
+          target: '/api/frames/dashboard',
+        },
+      },
+      {
+        type: 'button',
+        label: 'Deposit',
+        action: {
+          type: 'post',
+          target: '/api/frames/deposit',
+        },
+      },
+    ],
+  });
+});
+
+// Create handler using Frog's handle function
+const honoHandler = handle(app);
+
+// Wrap in Next.js compatible handlers
+export async function GET(request: NextRequest) {
+  return honoHandler(request);
+}
+
+export async function POST(request: NextRequest) {
+  return honoHandler(request);
+}
