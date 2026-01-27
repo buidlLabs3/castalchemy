@@ -1,28 +1,30 @@
 /**
- * Main landing page with Frame metadata
+ * Main landing page with Frame metadata and Mini App SDK
  */
+'use client';
 
-import type { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'CastAlchemy - Alchemix on Farcaster',
-  description: 'Self-repaying loans via Frames',
-  openGraph: {
-    title: 'CastAlchemy',
-    description: 'Alchemix on Farcaster - Self-repaying loans',
-    images: ['https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy'],
-  },
-  other: {
-    'fc:frame': 'vNext',
-    'fc:frame:image': 'https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy',
-    'fc:frame:image:aspect_ratio': '1.91:1',
-    'fc:frame:button:1': 'Open Frame',
-    'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': 'https://castalchemy.vercel.app/api/frames',
-  },
-};
+import { useEffect, useState } from 'react';
 
 export default function Home() {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Initialize Farcaster Mini App SDK
+    async function initSDK() {
+      try {
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        // Call ready() to hide splash screen
+        await sdk.actions.ready();
+        setIsReady(true);
+      } catch (error) {
+        console.error('Failed to initialize SDK:', error);
+        setIsReady(true); // Show content anyway
+      }
+    }
+    
+    initSDK();
+  }, []);
+
   return (
     <main
       style={{
@@ -42,10 +44,27 @@ export default function Home() {
       <p style={{ fontSize: '1.5rem', color: '#888', marginBottom: '2rem' }}>
         Alchemix on Farcaster
       </p>
-      <p style={{ fontSize: '1rem', color: '#666', textAlign: 'center', maxWidth: '600px' }}>
+      <p style={{ fontSize: '1rem', color: '#666', textAlign: 'center', maxWidth: '600px', marginBottom: '2rem' }}>
         Self-repaying loans via Frames, Cast Actions, and bots. Connect your wallet and start
         depositing to Alchemix vaults directly from your Farcaster feed.
       </p>
+      {isReady && (
+        <a 
+          href="/api/frames" 
+          style={{
+            padding: '1rem 2rem',
+            backgroundColor: '#4ade80',
+            color: '#000',
+            borderRadius: '0.5rem',
+            textDecoration: 'none',
+            fontWeight: 'bold',
+            fontSize: '1.1rem',
+            marginTop: '1rem',
+          }}
+        >
+          Open Frame
+        </a>
+      )}
     </main>
   );
 }

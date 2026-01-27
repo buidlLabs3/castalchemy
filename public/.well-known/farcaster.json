@@ -1,8 +1,8 @@
 {
   "accountAssociation": {
-    "header": "eyJmaWQiOjEsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhFRjY1YjJDQzQ1YjI3NzY5RjU0NzRDNjE3RjQxMjY4MzU3MjY5N0M2In0",
+    "header": "eyJmaWQiOjE0MTcwOTEsInR5cGUiOiJhdXRoIiwia2V5IjoiMHhiQjExNkQ0YmZiQmU5RDczZWI3OTQwMTZmYTU2RUQxN0M3MDQ3MTU3In0",
     "payload": "eyJkb21haW4iOiJjYXN0YWxjaGVteS52ZXJjZWwuYXBwIn0",
-    "signature": "MHhhOGE3ZjhkOTJmYzJiNjQwYjk5ZTM0YzdkZGQyYTU3ZjRmNDc3YjI5N2Q4YTRkZjI4NjBmNzE0NjU1YzYzYmI5MTFiNWI0YzIyNjQwNjdhMjNhMWQ5NDJlMWY1NzI0NmI0OWU3MmM4MzBiMzVhNGQ1NjdhMDkxOTQ0MjkxMzI2NjFi"
+    "signature": "dNaX5wcJDvyxt7gubj1h2Q77yautmNuzllsaAcGmZ14pauKpEZ7Mh7ugbQvuBmrhBT0OBBkV8uiQGjSEohf2axw="
   },
   "frame": {
     "version": "next",
@@ -10,7 +10,7 @@
     "iconUrl": "https://via.placeholder.com/200x200/1a1a1a/ffffff?text=CA",
     "splashImageUrl": "https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy",
     "splashBackgroundColor": "#1a1a1a",
-    "homeUrl": "https://castalchemy.vercel.app/api/frames",
+    "homeUrl": "https://castalchemy.vercel.app",
     "webhookUrl": "https://castalchemy.vercel.app/api/frames"
   }
 }
