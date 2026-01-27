@@ -31,18 +31,19 @@ export const TESTNET_NETWORKS: Record<string, { chainId: number; rpcUrl: string 
   },
 };
 
-// Alchemix V2 contract addresses (testnet - update with actual addresses)
+// Alchemix V2 contract addresses (Ethereum Mainnet)
+// Source: https://github.com/alchemix-finance/deployments
 export const ALCHEMIX_V2_VAULTS: Record<string, VaultConfig> = {
   alUSD: {
-    address: process.env.ALUSD_VAULT_ADDRESS || '0x0000000000000000000000000000000000000000', // TODO: Add actual address
-    tokenAddress: process.env.ALUSD_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000',
+    address: process.env.ALUSD_VAULT_ADDRESS || '0x5C6374a2ac4EBC38DeA0Fc1F8716e5Ea1AdD94dd', // AlchemistV2 alUSD
+    tokenAddress: process.env.ALUSD_TOKEN_ADDRESS || '0xBC6DA0FE9aD5f3b0d58160288917AA56653660E9', // alUSD token
     network: 'ethereum',
     type: 'alUSD',
     chainId: SUPPORTED_NETWORKS.ethereum.chainId,
   },
   alETH: {
-    address: process.env.ALETH_VAULT_ADDRESS || '0x0000000000000000000000000000000000000000', // TODO: Add actual address
-    tokenAddress: process.env.ALETH_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000',
+    address: process.env.ALETH_VAULT_ADDRESS || '0x062Bf725dC4cDF947aa79Ca2aaCCD4F385b13b5c', // AlchemistV2 alETH
+    tokenAddress: process.env.ALETH_TOKEN_ADDRESS || '0x0100546F2cD4C9D97f798fFC9755E47865FF7Ee6', // alETH token
     network: 'ethereum',
     type: 'alETH',
     chainId: SUPPORTED_NETWORKS.ethereum.chainId,

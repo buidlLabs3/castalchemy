@@ -5,3 +5,4 @@ export async function GET() {
   return NextResponse.json({ test: 'route works' });
 }
 
+
