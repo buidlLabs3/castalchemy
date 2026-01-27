@@ -50,7 +50,7 @@ export default function Home() {
       </p>
       {isReady && (
         <a 
-          href="/api/frames" 
+          href="/miniapp" 
           style={{
             padding: '1rem 2rem',
             backgroundColor: '#4ade80',
@@ -62,7 +62,7 @@ export default function Home() {
             marginTop: '1rem',
           }}
         >
-          Open Frame
+          Launch App
         </a>
       )}
     </main>

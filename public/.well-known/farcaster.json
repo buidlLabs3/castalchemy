@@ -10,7 +10,7 @@
     "iconUrl": "https://via.placeholder.com/200x200/1a1a1a/ffffff?text=CA",
     "splashImageUrl": "https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy",
     "splashBackgroundColor": "#1a1a1a",
-    "homeUrl": "https://castalchemy.vercel.app",
+    "homeUrl": "https://castalchemy.vercel.app/miniapp",
     "webhookUrl": "https://castalchemy.vercel.app/api/frames"
   }
 }
