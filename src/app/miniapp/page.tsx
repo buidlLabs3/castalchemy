@@ -7,14 +7,12 @@ import { useEffect, useState } from 'react';
 
 export default function MiniApp() {
   const [isReady, setIsReady] = useState(false);
-  const [sdk, setSdk] = useState<any>(null);
 
   useEffect(() => {
     async function initSDK() {
       try {
         const { sdk: farcasterSdk } = await import('@farcaster/miniapp-sdk');
         await farcasterSdk.actions.ready();
-        setSdk(farcasterSdk);
         setIsReady(true);
       } catch (error) {
         console.error('Failed to initialize SDK:', error);
