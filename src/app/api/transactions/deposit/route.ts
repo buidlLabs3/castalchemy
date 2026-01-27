@@ -8,6 +8,9 @@ import { getAlchemixClient } from '@/lib/contracts/alchemix';
 import { formatError } from '@/lib/utils/errors';
 import type { VaultType } from '@/types';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

@@ -4,6 +4,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { WalletButton } from '@/components/WalletButton';
 
 export default function MiniApp() {
   const [isReady, setIsReady] = useState(false);
@@ -44,6 +45,11 @@ export default function MiniApp() {
       </p>
 
       {isReady && (
+        <>
+          <div style={{ marginBottom: '2rem' }}>
+            <WalletButton />
+          </div>
+        
         <div style={{ 
           display: 'flex', 
           flexDirection: 'column', 
@@ -102,6 +108,7 @@ export default function MiniApp() {
             </p>
           </div>
         </div>
+        </>
       )}
     </main>
   );
