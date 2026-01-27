@@ -52,9 +52,7 @@ export default function MiniApp() {
           maxWidth: '400px' 
         }}>
           <a
-            href="https://castalchemy.vercel.app/api/frames"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/miniapp/deposit"
             style={{
               padding: '1.5rem',
               backgroundColor: '#4ade80',
@@ -71,9 +69,7 @@ export default function MiniApp() {
           </a>
 
           <a
-            href="https://castalchemy.vercel.app/api/frames/dashboard"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/miniapp/positions"
             style={{
               padding: '1.5rem',
               backgroundColor: '#60a5fa',
