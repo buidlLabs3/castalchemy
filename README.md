@@ -1,67 +1,45 @@
-# CastAlchemy
+# CastAlchemy ⚗️
 
-Alchemix on Farcaster - Self-repaying loans via Frames, Cast Actions, and bots.
+Self-repaying loans on Farcaster via Alchemix protocol.
 
-## Overview
+## Quick Start
 
-CastAlchemy brings Alchemix's self-repaying loan protocol to Farcaster, enabling users to deposit, borrow, and manage positions natively within their feed.
+1. **Open Mini App:** https://castalchemy.vercel.app/miniapp
+2. **Connect Wallet:** Auto-connects in Farcaster or use external wallet
+3. **Get Test ETH:** https://sepoliafaucet.com (Sepolia testnet)
+4. **Test Features:** Send, Receive, Copy address, Switch wallets
 
-## Milestones
+## Features
 
-See `docs/milestones.md` for detailed milestone breakdown.
+- 🎭 Farcaster native wallet support
+- 🔗 External wallet (MetaMask, WalletConnect)
+- 📤 Send ETH transactions
+- 📥 Receive with QR code
+- 💎 Alchemix positions dashboard
+- 🧪 Sepolia testnet (safe testing)
 
-### Milestone 1 (Current)
-- Farcaster Frames SDK integration
-- Alchemix V2 contract layer (alUSD, alETH)
-- Deposit Frame
-- Position Dashboard Frame
-- Wallet connections (Coinbase, Rainbow, MetaMask)
-- Transaction signing & error handling
-- Testnet deployment
+## Tech Stack
 
-## Getting Started
+- Next.js 14
+- Farcaster Mini App SDK
+- Wagmi + RainbowKit
+- Sepolia Testnet
 
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
+## Alchemix V3 Integration
 
-### Installation
+Coming February 6th, 2026
+
+## Development
 
 ```bash
 npm install
-```
-
-### Development
-
-```bash
 npm run dev
 ```
 
-The app will be available at `http://localhost:3000`
+## Deployment
 
-### Build
+Deployed on Vercel: https://castalchemy.vercel.app
 
-```bash
-npm run build
-npm start
-```
+---
 
-## Project Structure
-
-```
-castalchemy/
-├── src/
-│   ├── app/              # Next.js app router
-│   ├── lib/              # Core libraries
-│   │   ├── contracts/    # Alchemix contract interfaces
-│   │   ├── frames/       # Frame handlers
-│   │   └── utils/        # Utilities
-│   └── types/            # TypeScript types
-├── docs/                 # Documentation
-└── public/               # Static assets
-```
-
-## License
-
-MIT
-
+Built with ⚗️ for Farcaster
