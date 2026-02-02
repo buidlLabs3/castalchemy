@@ -58,6 +58,23 @@ export default function MiniApp() {
           maxWidth: '400px' 
         }}>
           <a
+            href="/wallet-test"
+            style={{
+              padding: '1.5rem',
+              backgroundColor: '#8b5cf6',
+              color: '#fff',
+              borderRadius: '0.75rem',
+              textDecoration: 'none',
+              fontWeight: 'bold',
+              fontSize: '1.1rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+            }}
+          >
+            🔐 Test Wallet
+          </a>
+
+          <a
             href="/miniapp/deposit"
             style={{
               padding: '1.5rem',
