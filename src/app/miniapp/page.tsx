@@ -20,7 +20,10 @@ export default function MiniApp() {
   const [copied, setCopied] = useState(false);
   
   const { address, isConnected, walletMode, switchToExternal, switchToFarcaster, disconnect } = useWallet();
-  const { data: balance } = useBalance({ address: address as Address });
+  const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({ 
+    address: address as Address,
+    chainId: 11155111, // Sepolia testnet
+  });
   const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
@@ -242,15 +245,40 @@ export default function MiniApp() {
                   fontSize: '0.85rem', 
                   opacity: 0.9,
                   marginBottom: '0.25rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}>
-                  Total Balance
+                  <span>Total Balance</span>
+                  <button
+                    onClick={() => refetchBalance()}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: '1rem',
+                      padding: '0.25rem',
+                    }}
+                    title="Refresh balance"
+                  >
+                    🔄
+                  </button>
                 </div>
                 <div style={{ 
                   fontSize: '2.5rem', 
                   fontWeight: 'bold',
                   letterSpacing: '-0.02em',
                 }}>
-                  {balance ? parseFloat(formatEther(balance.value)).toFixed(4) : '0.0000'} ETH
+                  {balanceLoading ? (
+                    <span style={{ fontSize: '1.5rem', opacity: 0.6 }}>Loading...</span>
+                  ) : balanceError ? (
+                    <span style={{ fontSize: '1rem', color: '#ff4444' }}>Error loading</span>
+                  ) : balance ? (
+                    `${parseFloat(formatEther(balance.value)).toFixed(4)} ETH`
+                  ) : (
+                    '0.0000 ETH'
+                  )}
                 </div>
               </div>
               
@@ -259,7 +287,13 @@ export default function MiniApp() {
                 opacity: 0.8,
                 marginBottom: '1rem',
               }}>
-                Sepolia Testnet ETH (No real value)
+                {balanceError ? (
+                  <span style={{ color: '#ff4444' }}>
+                    ⚠️ Balance fetch failed. Click 🔄 to retry
+                  </span>
+                ) : (
+                  'Sepolia Testnet ETH (No real value)'
+                )}
               </div>
 
               {/* Send/Receive Buttons */}
