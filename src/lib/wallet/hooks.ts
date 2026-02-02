@@ -72,11 +72,30 @@ export function useWallet(): WalletState {
     };
   }, []);
 
-  const switchToExternal = () => {
+  const switchToExternal = async () => {
     setWalletMode('external');
+    
+    // Disconnect Farcaster first if connected
+    if (farcasterAddress) {
+      setFarcasterAddress(undefined);
+    }
+    
+    // Try MetaMask first, then WalletConnect
     const metaMaskConnector = connectors.find((c) => c.id === 'injected' || c.id === 'metaMask');
+    const wcConnector = connectors.find((c) => c.id === 'walletConnect');
+    
     if (metaMaskConnector) {
-      connect({ connector: metaMaskConnector });
+      try {
+        connect({ connector: metaMaskConnector });
+      } catch (error) {
+        console.error('MetaMask connection failed:', error);
+        // Try WalletConnect as fallback
+        if (wcConnector) {
+          connect({ connector: wcConnector });
+        }
+      }
+    } else if (wcConnector) {
+      connect({ connector: wcConnector });
     }
   };
 

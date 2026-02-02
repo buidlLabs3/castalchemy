@@ -6,10 +6,11 @@
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/lib/wallet/hooks';
-import { useBalance, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
-import { formatEther, parseEther } from 'viem';
+import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { parseEther } from 'viem';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { Address } from 'viem';
+import { fetchBalance } from '@/lib/wallet/balance';
 
 export default function MiniApp() {
   const [showSend, setShowSend] = useState(false);
@@ -18,12 +19,11 @@ export default function MiniApp() {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   
   const { address, isConnected, walletMode, isFarcasterAvailable, switchToExternal, switchToFarcaster, disconnect } = useWallet();
-  const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({ 
-    address: address as Address,
-    chainId: 11155111, // Sepolia testnet
-  });
   const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
@@ -39,6 +39,50 @@ export default function MiniApp() {
     }
     initSDK();
   }, []);
+
+  // Custom balance fetcher that works with Farcaster wallet
+  const loadBalance = async () => {
+    if (!address) return;
+    
+    setBalanceLoading(true);
+    setBalanceError(null);
+    
+    try {
+      let provider = null;
+      
+      // Get provider based on wallet mode
+      if (walletMode === 'farcaster') {
+        const { sdk } = await import('@farcaster/miniapp-sdk');
+        provider = sdk.wallet?.ethProvider;
+      } else if (typeof window !== 'undefined' && 'ethereum' in window) {
+        provider = (window as any).ethereum;
+      }
+      
+      const balanceStr = await fetchBalance(address as Address, provider);
+      setBalance(balanceStr);
+    } catch (error) {
+      console.error('Failed to load balance:', error);
+      setBalanceError('Failed to load balance');
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
+  // Load balance when address or wallet mode changes
+  useEffect(() => {
+    if (address && isConnected) {
+      loadBalance();
+    }
+  }, [address, isConnected, walletMode]);
+
+  // Refresh balance after successful transaction
+  useEffect(() => {
+    if (isSuccess) {
+      setTimeout(() => {
+        loadBalance();
+      }, 2000);
+    }
+  }, [isSuccess]);
 
   const copyAddress = () => {
     if (address) {
@@ -258,14 +302,16 @@ export default function MiniApp() {
                 }}>
                   <span>Total Balance</span>
                   <button
-                    onClick={() => refetchBalance()}
+                    onClick={() => loadBalance()}
+                    disabled={balanceLoading}
                     style={{
                       background: 'none',
                       border: 'none',
                       color: '#fff',
-                      cursor: 'pointer',
+                      cursor: balanceLoading ? 'not-allowed' : 'pointer',
                       fontSize: '1rem',
                       padding: '0.25rem',
+                      opacity: balanceLoading ? 0.5 : 1,
                     }}
                     title="Refresh balance"
                   >
@@ -280,9 +326,9 @@ export default function MiniApp() {
                   {balanceLoading ? (
                     <span style={{ fontSize: '1.5rem', opacity: 0.6 }}>Loading...</span>
                   ) : balanceError ? (
-                    <span style={{ fontSize: '1rem', color: '#ff4444' }}>Error loading</span>
+                    <span style={{ fontSize: '1rem', color: '#ff4444' }}>Error</span>
                   ) : balance ? (
-                    `${parseFloat(formatEther(balance.value)).toFixed(4)} ETH`
+                    `${parseFloat(balance).toFixed(4)} ETH`
                   ) : (
                     '0.0000 ETH'
                   )}
