@@ -48,14 +48,15 @@ export default function MiniApp() {
     setBalanceError(null);
     
     try {
-      let provider = null;
+      let provider: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } | undefined;
       
       // Get provider based on wallet mode
       if (walletMode === 'farcaster') {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         provider = sdk.wallet?.ethProvider;
       } else if (typeof window !== 'undefined' && 'ethereum' in window) {
-        provider = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+        const win = window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } };
+        provider = win.ethereum;
       }
       
       const balanceStr = await fetchBalance(address as Address, provider);
