@@ -1,6 +1,6 @@
 /**
  * CastAlchemy - Unified Wallet Dashboard for Farcaster
- * Full wallet functionality: Send, Receive, Copy, Switch wallets
+ * Optimized for instant loading - no lag!
  */
 'use client';
 
@@ -12,7 +12,6 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { Address } from 'viem';
 
 export default function MiniApp() {
-  const [isReady, setIsReady] = useState(false);
   const [showSend, setShowSend] = useState(false);
   const [showReceive, setShowReceive] = useState(false);
   const [showWalletSwitch, setShowWalletSwitch] = useState(false);
@@ -20,20 +19,19 @@ export default function MiniApp() {
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
   
-  const { address, isConnected, isConnecting, walletMode, switchToExternal, switchToFarcaster, disconnect } = useWallet();
+  const { address, isConnected, walletMode, switchToExternal, switchToFarcaster, disconnect } = useWallet();
   const { data: balance } = useBalance({ address: address as Address });
   const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
+  // Fast SDK initialization - non-blocking
   useEffect(() => {
     async function initSDK() {
       try {
         const { sdk } = await import('@farcaster/miniapp-sdk');
-        await sdk.actions.ready();
-        setIsReady(true);
-      } catch (error) {
-        console.error('SDK init failed:', error);
-        setIsReady(true);
+        sdk.actions.ready();
+      } catch {
+        // Not in Farcaster, silently fail
       }
     }
     initSDK();
@@ -67,79 +65,6 @@ export default function MiniApp() {
       setTimeout(resetSend, 3000);
     }
   }, [isSuccess]);
-
-  if (!isReady) {
-    return (
-      <main style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        backgroundColor: '#0a0a0a',
-        color: '#fff',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚗️</div>
-          <div>Loading CastAlchemy...</div>
-        </div>
-      </main>
-    );
-  }
-
-  if (isConnecting) {
-    return (
-      <main style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        backgroundColor: '#0a0a0a',
-        color: '#fff',
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔐</div>
-          <div>Connecting wallet...</div>
-        </div>
-      </main>
-    );
-  }
-
-  if (!isConnected || !address) {
-    return (
-      <main style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        padding: '2rem',
-        backgroundColor: '#0a0a0a',
-        color: '#fff',
-      }}>
-        <div style={{ textAlign: 'center', maxWidth: '400px' }}>
-          <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⚗️</div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            CastAlchemy
-          </h1>
-          <p style={{ color: '#888', marginBottom: '2rem' }}>
-            Self-repaying loans on Farcaster
-          </p>
-          <div style={{
-            padding: '1.5rem',
-            backgroundColor: '#1a1a1a',
-            borderRadius: '1rem',
-            border: '2px solid #2a2a2a',
-            marginBottom: '1rem',
-          }}>
-            <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1rem' }}>
-              Connecting in Farcaster will auto-detect your wallet, or connect manually:
-            </p>
-            <ConnectButton />
-          </div>
-        </div>
-      </main>
-    );
-  }
 
   return (
     <main style={{
@@ -179,592 +104,613 @@ export default function MiniApp() {
           </div>
         </div>
 
-        {/* Wallet Card */}
-        <div style={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          borderRadius: '1.25rem',
-          padding: '1.5rem',
-          boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
-        }}>
+        {/* Wallet Card - Shows immediately */}
+        {!isConnected || !address ? (
           <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '1rem',
-          }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ 
-                fontSize: '0.75rem', 
-                textTransform: 'uppercase', 
-                letterSpacing: '0.05em',
-                opacity: 0.9,
-                marginBottom: '0.25rem',
-              }}>
-                {walletMode === 'farcaster' ? '🎭 Farcaster Wallet' : '🔗 External Wallet'}
-              </div>
-              <div 
-                onClick={copyAddress}
-                style={{ 
-                  fontFamily: 'monospace', 
-                  fontSize: '0.9rem',
-                  opacity: 0.9,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}
-              >
-                {address.slice(0, 6)}...{address.slice(-4)}
-                <span style={{ fontSize: '1rem' }}>{copied ? '✅' : '📋'}</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowWalletSwitch(!showWalletSwitch)}
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                padding: '0.5rem 0.75rem',
-                borderRadius: '0.5rem',
-                fontSize: '0.8rem',
-                fontWeight: 'bold',
-                border: 'none',
-                color: '#fff',
-                cursor: 'pointer',
-              }}
-            >
-              ⚙️ Switch
-            </button>
-          </div>
-
-          {/* Wallet Switcher */}
-          {showWalletSwitch && (
-            <div style={{
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              padding: '1rem',
-              borderRadius: '0.75rem',
-              marginBottom: '1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem',
-            }}>
-              <button
-                onClick={switchToFarcaster}
-                disabled={walletMode === 'farcaster'}
-                style={{
-                  padding: '0.75rem',
-                  backgroundColor: walletMode === 'farcaster' ? '#4ade80' : 'rgba(255,255,255,0.1)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: 'bold',
-                  cursor: walletMode === 'farcaster' ? 'default' : 'pointer',
-                }}
-              >
-                🎭 Use Farcaster Wallet
-              </button>
-              <button
-                onClick={switchToExternal}
-                disabled={walletMode === 'external'}
-                style={{
-                  padding: '0.75rem',
-                  backgroundColor: walletMode === 'external' ? '#60a5fa' : 'rgba(255,255,255,0.1)',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: 'bold',
-                  cursor: walletMode === 'external' ? 'default' : 'pointer',
-                }}
-              >
-                🔗 Use External Wallet
-              </button>
-              <button
-                onClick={disconnect}
-                style={{
-                  padding: '0.75rem',
-                  backgroundColor: 'rgba(255,68,68,0.2)',
-                  color: '#ff4444',
-                  border: 'none',
-                  borderRadius: '0.5rem',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                }}
-              >
-                ⚠️ Disconnect
-              </button>
-            </div>
-          )}
-
-          <div style={{ marginBottom: '0.5rem' }}>
-            <div style={{ 
-              fontSize: '0.85rem', 
-              opacity: 0.9,
-              marginBottom: '0.25rem',
-            }}>
-              Total Balance
-            </div>
-            <div style={{ 
-              fontSize: '2.5rem', 
-              fontWeight: 'bold',
-              letterSpacing: '-0.02em',
-            }}>
-              {balance ? parseFloat(formatEther(balance.value)).toFixed(4) : '0.0000'} ETH
-            </div>
-          </div>
-          
-          <div style={{ 
-            fontSize: '0.85rem', 
-            opacity: 0.8,
-            marginBottom: '1rem',
-          }}>
-            Sepolia Testnet ETH (No real value)
-          </div>
-
-          {/* Send/Receive Buttons */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '0.75rem',
-          }}>
-            <button
-              onClick={() => { setShowSend(true); setShowReceive(false); }}
-              style={{
-                padding: '0.75rem',
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-              }}
-            >
-              📤 Send
-            </button>
-            <button
-              onClick={() => { setShowReceive(true); setShowSend(false); }}
-              style={{
-                padding: '0.75rem',
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-              }}
-            >
-              📥 Receive
-            </button>
-          </div>
-        </div>
-
-        {/* Send Modal */}
-        {showSend && (
-          <div style={{
-            backgroundColor: '#1a1a1a',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             borderRadius: '1.25rem',
             padding: '1.5rem',
-            border: '2px solid #2a2a2a',
+            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
+            textAlign: 'center',
           }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1rem',
-            }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
-                📤 Send ETH
-              </h2>
-              <button
-                onClick={() => setShowSend(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#888',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                Recipient Address:
-              </label>
-              <input
-                type="text"
-                placeholder="0x..."
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                disabled={isPending || isConfirming}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  backgroundColor: '#0f1419',
-                  color: '#fff',
-                  border: '2px solid #2a2a2a',
-                  borderRadius: '0.5rem',
-                  fontFamily: 'monospace',
-                  fontSize: '0.9rem',
-                }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                Amount (ETH):
-              </label>
-              <input
-                type="number"
-                step="0.001"
-                placeholder="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={isPending || isConfirming}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  backgroundColor: '#0f1419',
-                  color: '#fff',
-                  border: '2px solid #2a2a2a',
-                  borderRadius: '0.5rem',
-                  fontSize: '0.9rem',
-                }}
-              />
-            </div>
-
-            <button
-              onClick={handleSend}
-              disabled={!recipient || !amount || isPending || isConfirming}
-              style={{
-                width: '100%',
-                padding: '1rem',
-                backgroundColor: recipient && amount && !isPending && !isConfirming ? '#4ade80' : '#444',
-                color: recipient && amount && !isPending && !isConfirming ? '#000' : '#888',
-                border: 'none',
-                borderRadius: '0.5rem',
-                fontWeight: 'bold',
-                cursor: recipient && amount && !isPending && !isConfirming ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {isPending ? '⏳ Confirming...' : 
-               isConfirming ? '⏳ Sending...' : 
-               isSuccess ? '✅ Sent!' : 
-               'Send Transaction'}
-            </button>
-
-            {error && (
-              <div style={{
-                marginTop: '1rem',
-                padding: '1rem',
-                backgroundColor: '#ff444420',
-                border: '2px solid #ff4444',
-                borderRadius: '0.5rem',
-                color: '#ff6666',
-                fontSize: '0.85rem',
-              }}>
-                ❌ {error.message}
-              </div>
-            )}
-
-            {txHash && (
-              <div style={{
-                marginTop: '1rem',
-                padding: '1rem',
-                backgroundColor: '#4ade8020',
-                border: '2px solid #4ade80',
-                borderRadius: '0.5rem',
-              }}>
-                <div style={{ color: '#4ade80', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                  ✅ Transaction Hash:
-                </div>
-                <div style={{
-                  fontFamily: 'monospace',
-                  fontSize: '0.8rem',
-                  wordBreak: 'break-all',
-                  marginBottom: '0.75rem',
-                }}>
-                  {txHash}
-                </div>
-                <a
-                  href={`https://sepolia.etherscan.io/tx/${txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'inline-block',
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#4ade80',
-                    color: '#000',
-                    textDecoration: 'none',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.9rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  View on Sepolia Etherscan →
-                </a>
-              </div>
-            )}
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🎭</div>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Connect Wallet</h2>
+            <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1.5rem' }}>
+              In Farcaster: Auto-connects<br />
+              Outside: Use external wallet
+            </p>
+            <ConnectButton />
           </div>
-        )}
-
-        {/* Receive Modal */}
-        {showReceive && (
-          <div style={{
-            backgroundColor: '#1a1a1a',
-            borderRadius: '1.25rem',
-            padding: '1.5rem',
-            border: '2px solid #2a2a2a',
-          }}>
+        ) : (
+          <>
+            {/* Wallet Card */}
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1rem',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '1.25rem',
+              padding: '1.5rem',
+              boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
             }}>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
-                📥 Receive ETH
-              </h2>
-              <button
-                onClick={() => setShowReceive(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#888',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ textAlign: 'center' }}>
               <div style={{
-                backgroundColor: '#fff',
-                padding: '1rem',
-                borderRadius: '0.75rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
                 marginBottom: '1rem',
               }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${address}`}
-                  alt="QR Code"
-                  style={{ width: '200px', height: '200px' }}
-                />
-              </div>
-              
-              <div style={{
-                backgroundColor: '#0f1419',
-                padding: '1rem',
-                borderRadius: '0.5rem',
-                marginBottom: '1rem',
-              }}>
-                <div style={{ 
-                  fontFamily: 'monospace', 
-                  fontSize: '0.9rem',
-                  wordBreak: 'break-all',
-                  marginBottom: '0.75rem',
-                }}>
-                  {address}
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontSize: '0.75rem', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    opacity: 0.9,
+                    marginBottom: '0.25rem',
+                  }}>
+                    {walletMode === 'farcaster' ? '🎭 Farcaster Wallet' : '🔗 External Wallet'}
+                  </div>
+                  <div 
+                    onClick={copyAddress}
+                    style={{ 
+                      fontFamily: 'monospace', 
+                      fontSize: '0.9rem',
+                      opacity: 0.9,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    {address.slice(0, 6)}...{address.slice(-4)}
+                    <span style={{ fontSize: '1rem' }}>{copied ? '✅' : '📋'}</span>
+                  </div>
                 </div>
                 <button
-                  onClick={copyAddress}
+                  onClick={() => setShowWalletSwitch(!showWalletSwitch)}
                   style={{
-                    padding: '0.75rem 1.5rem',
-                    backgroundColor: '#4ade80',
-                    color: '#000',
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.8rem',
+                    fontWeight: 'bold',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ⚙️ Switch
+                </button>
+              </div>
+
+              {/* Wallet Switcher */}
+              {showWalletSwitch && (
+                <div style={{
+                  backgroundColor: 'rgba(0,0,0,0.3)',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                }}>
+                  <button
+                    onClick={switchToFarcaster}
+                    disabled={walletMode === 'farcaster'}
+                    style={{
+                      padding: '0.75rem',
+                      backgroundColor: walletMode === 'farcaster' ? '#4ade80' : 'rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontWeight: 'bold',
+                      cursor: walletMode === 'farcaster' ? 'default' : 'pointer',
+                    }}
+                  >
+                    🎭 Use Farcaster Wallet
+                  </button>
+                  <button
+                    onClick={switchToExternal}
+                    disabled={walletMode === 'external'}
+                    style={{
+                      padding: '0.75rem',
+                      backgroundColor: walletMode === 'external' ? '#60a5fa' : 'rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontWeight: 'bold',
+                      cursor: walletMode === 'external' ? 'default' : 'pointer',
+                    }}
+                  >
+                    🔗 Use External Wallet
+                  </button>
+                  <button
+                    onClick={disconnect}
+                    style={{
+                      padding: '0.75rem',
+                      backgroundColor: 'rgba(255,68,68,0.2)',
+                      color: '#ff4444',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ⚠️ Disconnect
+                  </button>
+                </div>
+              )}
+
+              <div style={{ marginBottom: '0.5rem' }}>
+                <div style={{ 
+                  fontSize: '0.85rem', 
+                  opacity: 0.9,
+                  marginBottom: '0.25rem',
+                }}>
+                  Total Balance
+                </div>
+                <div style={{ 
+                  fontSize: '2.5rem', 
+                  fontWeight: 'bold',
+                  letterSpacing: '-0.02em',
+                }}>
+                  {balance ? parseFloat(formatEther(balance.value)).toFixed(4) : '0.0000'} ETH
+                </div>
+              </div>
+              
+              <div style={{ 
+                fontSize: '0.85rem', 
+                opacity: 0.8,
+                marginBottom: '1rem',
+              }}>
+                Sepolia Testnet ETH (No real value)
+              </div>
+
+              {/* Send/Receive Buttons */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '0.75rem',
+              }}>
+                <button
+                  onClick={() => { setShowSend(true); setShowReceive(false); }}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    color: '#fff',
                     border: 'none',
                     borderRadius: '0.5rem',
                     fontWeight: 'bold',
                     cursor: 'pointer',
+                    fontSize: '0.9rem',
                   }}
                 >
-                  {copied ? '✅ Copied!' : '📋 Copy Address'}
+                  📤 Send
+                </button>
+                <button
+                  onClick={() => { setShowReceive(true); setShowSend(false); }}
+                  style={{
+                    padding: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  📥 Receive
                 </button>
               </div>
+            </div>
 
-              <div style={{ fontSize: '0.85rem', color: '#888' }}>
-                Scan QR code or copy address to receive ETH
+            {/* Send Modal */}
+            {showSend && (
+              <div style={{
+                backgroundColor: '#1a1a1a',
+                borderRadius: '1.25rem',
+                padding: '1.5rem',
+                border: '2px solid #2a2a2a',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem',
+                }}>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
+                    📤 Send ETH
+                  </h2>
+                  <button
+                    onClick={() => setShowSend(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#888',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    Recipient Address:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="0x..."
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    disabled={isPending || isConfirming}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      backgroundColor: '#0f1419',
+                      color: '#fff',
+                      border: '2px solid #2a2a2a',
+                      borderRadius: '0.5rem',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                    Amount (ETH):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    disabled={isPending || isConfirming}
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      backgroundColor: '#0f1419',
+                      color: '#fff',
+                      border: '2px solid #2a2a2a',
+                      borderRadius: '0.5rem',
+                      fontSize: '0.9rem',
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={handleSend}
+                  disabled={!recipient || !amount || isPending || isConfirming}
+                  style={{
+                    width: '100%',
+                    padding: '1rem',
+                    backgroundColor: recipient && amount && !isPending && !isConfirming ? '#4ade80' : '#444',
+                    color: recipient && amount && !isPending && !isConfirming ? '#000' : '#888',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontWeight: 'bold',
+                    cursor: recipient && amount && !isPending && !isConfirming ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  {isPending ? '⏳ Confirming...' : 
+                   isConfirming ? '⏳ Sending...' : 
+                   isSuccess ? '✅ Sent!' : 
+                   'Send Transaction'}
+                </button>
+
+                {error && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    backgroundColor: '#ff444420',
+                    border: '2px solid #ff4444',
+                    borderRadius: '0.5rem',
+                    color: '#ff6666',
+                    fontSize: '0.85rem',
+                  }}>
+                    ❌ {error.message}
+                  </div>
+                )}
+
+                {txHash && (
+                  <div style={{
+                    marginTop: '1rem',
+                    padding: '1rem',
+                    backgroundColor: '#4ade8020',
+                    border: '2px solid #4ade80',
+                    borderRadius: '0.5rem',
+                  }}>
+                    <div style={{ color: '#4ade80', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                      ✅ Transaction Hash:
+                    </div>
+                    <div style={{
+                      fontFamily: 'monospace',
+                      fontSize: '0.8rem',
+                      wordBreak: 'break-all',
+                      marginBottom: '0.75rem',
+                    }}>
+                      {txHash}
+                    </div>
+                    <a
+                      href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-block',
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#4ade80',
+                        color: '#000',
+                        textDecoration: 'none',
+                        borderRadius: '0.5rem',
+                        fontSize: '0.9rem',
+                        fontWeight: 'bold',
+                      }}
+                    >
+                      View on Sepolia Etherscan →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Receive Modal */}
+            {showReceive && (
+              <div style={{
+                backgroundColor: '#1a1a1a',
+                borderRadius: '1.25rem',
+                padding: '1.5rem',
+                border: '2px solid #2a2a2a',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1rem',
+                }}>
+                  <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
+                    📥 Receive ETH
+                  </h2>
+                  <button
+                    onClick={() => setShowReceive(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#888',
+                      fontSize: '1.5rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{
+                    backgroundColor: '#fff',
+                    padding: '1rem',
+                    borderRadius: '0.75rem',
+                    marginBottom: '1rem',
+                  }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${address}`}
+                      alt="QR Code"
+                      style={{ width: '200px', height: '200px' }}
+                    />
+                  </div>
+                  
+                  <div style={{
+                    backgroundColor: '#0f1419',
+                    padding: '1rem',
+                    borderRadius: '0.5rem',
+                    marginBottom: '1rem',
+                  }}>
+                    <div style={{ 
+                      fontFamily: 'monospace', 
+                      fontSize: '0.9rem',
+                      wordBreak: 'break-all',
+                      marginBottom: '0.75rem',
+                    }}>
+                      {address}
+                    </div>
+                    <button
+                      onClick={copyAddress}
+                      style={{
+                        padding: '0.75rem 1.5rem',
+                        backgroundColor: '#4ade80',
+                        color: '#000',
+                        border: 'none',
+                        borderRadius: '0.5rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {copied ? '✅ Copied!' : '📋 Copy Address'}
+                    </button>
+                  </div>
+
+                  <div style={{ fontSize: '0.85rem', color: '#888' }}>
+                    Scan QR code or copy address to receive ETH
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Alchemix Positions */}
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '1.25rem',
+              padding: '1.5rem',
+              border: '2px solid #2a2a2a',
+            }}>
+              <h2 style={{ 
+                fontSize: '1.2rem', 
+                fontWeight: 'bold', 
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                <span>💎</span> Alchemix Positions
+              </h2>
+
+              {/* alUSD Vault */}
+              <div style={{
+                backgroundColor: '#0f1419',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                marginBottom: '0.75rem',
+                border: '1px solid #2a2a2a',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.75rem',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: '#4ade80',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1rem',
+                    }}>
+                      $
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 'bold' }}>alUSD Vault</div>
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>Stablecoin</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Deposited</div>
+                    <div style={{ fontWeight: 'bold', color: '#4ade80' }}>$0.00</div>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.5rem',
+                  fontSize: '0.85rem',
+                }}>
+                  <div>
+                    <div style={{ color: '#888' }}>Borrowed</div>
+                    <div style={{ fontWeight: 'bold' }}>$0.00</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#888' }}>Available</div>
+                    <div style={{ fontWeight: 'bold', color: '#4ade80' }}>$0.00</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* alETH Vault */}
+              <div style={{
+                backgroundColor: '#0f1419',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                border: '1px solid #2a2a2a',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '0.75rem',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: '#60a5fa',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1rem',
+                    }}>
+                      Ξ
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 'bold' }}>alETH Vault</div>
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>Ethereum</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Deposited</div>
+                    <div style={{ fontWeight: 'bold', color: '#60a5fa' }}>0.0000 ETH</div>
+                  </div>
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '0.5rem',
+                  fontSize: '0.85rem',
+                }}>
+                  <div>
+                    <div style={{ color: '#888' }}>Borrowed</div>
+                    <div style={{ fontWeight: 'bold' }}>0.0000 ETH</div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#888' }}>Available</div>
+                    <div style={{ fontWeight: 'bold', color: '#60a5fa' }}>0.0000 ETH</div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Alchemix Positions */}
-        <div style={{
-          backgroundColor: '#1a1a1a',
-          borderRadius: '1.25rem',
-          padding: '1.5rem',
-          border: '2px solid #2a2a2a',
-        }}>
-          <h2 style={{ 
-            fontSize: '1.2rem', 
-            fontWeight: 'bold', 
-            marginBottom: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-          }}>
-            <span>💎</span> Alchemix Positions
-          </h2>
-
-          {/* alUSD Vault */}
-          <div style={{
-            backgroundColor: '#0f1419',
-            borderRadius: '0.75rem',
-            padding: '1rem',
-            marginBottom: '0.75rem',
-            border: '1px solid #2a2a2a',
-          }}>
+            {/* Quick Actions */}
             <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '0.75rem',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '0.75rem',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
+              <button
+                onClick={() => alert('Deposit functionality coming with Alchemix V3 on Feb 6th!')}
+                style={{
+                  padding: '1.25rem',
                   backgroundColor: '#4ade80',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  fontWeight: 'bold',
                   fontSize: '1rem',
-                }}>
-                  $
-                </div>
-                <div>
-                  <div style={{ fontWeight: 'bold' }}>alUSD Vault</div>
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>Stablecoin</div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: '#888' }}>Deposited</div>
-                <div style={{ fontWeight: 'bold', color: '#4ade80' }}>$0.00</div>
-              </div>
-            </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.5rem',
-              fontSize: '0.85rem',
-            }}>
-              <div>
-                <div style={{ color: '#888' }}>Borrowed</div>
-                <div style={{ fontWeight: 'bold' }}>$0.00</div>
-              </div>
-              <div>
-                <div style={{ color: '#888' }}>Available</div>
-                <div style={{ fontWeight: 'bold', color: '#4ade80' }}>$0.00</div>
-              </div>
-            </div>
-          </div>
-
-          {/* alETH Vault */}
-          <div style={{
-            backgroundColor: '#0f1419',
-            borderRadius: '0.75rem',
-            padding: '1rem',
-            border: '1px solid #2a2a2a',
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '0.75rem',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>💰</span>
+                Deposit
+              </button>
+              <button
+                onClick={() => alert('Borrow functionality coming with Alchemix V3 on Feb 6th!')}
+                style={{
+                  padding: '1.25rem',
                   backgroundColor: '#60a5fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  color: '#000',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  fontWeight: 'bold',
                   fontSize: '1rem',
-                }}>
-                  Ξ
-                </div>
-                <div>
-                  <div style={{ fontWeight: 'bold' }}>alETH Vault</div>
-                  <div style={{ fontSize: '0.75rem', color: '#888' }}>Ethereum</div>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: '#888' }}>Deposited</div>
-                <div style={{ fontWeight: 'bold', color: '#60a5fa' }}>0.0000 ETH</div>
-              </div>
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>🏦</span>
+                Borrow
+              </button>
             </div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.5rem',
-              fontSize: '0.85rem',
-            }}>
-              <div>
-                <div style={{ color: '#888' }}>Borrowed</div>
-                <div style={{ fontWeight: 'bold' }}>0.0000 ETH</div>
-              </div>
-              <div>
-                <div style={{ color: '#888' }}>Available</div>
-                <div style={{ fontWeight: 'bold', color: '#60a5fa' }}>0.0000 ETH</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '0.75rem',
-        }}>
-          <button
-            onClick={() => alert('Deposit functionality coming with Alchemix V3 on Feb 6th!')}
-            style={{
-              padding: '1.25rem',
-              backgroundColor: '#4ade80',
-              color: '#000',
-              border: 'none',
-              borderRadius: '1rem',
-              fontWeight: 'bold',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <span style={{ fontSize: '1.5rem' }}>💰</span>
-            Deposit
-          </button>
-          <button
-            onClick={() => alert('Borrow functionality coming with Alchemix V3 on Feb 6th!')}
-            style={{
-              padding: '1.25rem',
-              backgroundColor: '#60a5fa',
-              color: '#000',
-              border: 'none',
-              borderRadius: '1rem',
-              fontWeight: 'bold',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <span style={{ fontSize: '1.5rem' }}>🏦</span>
-            Borrow
-          </button>
-        </div>
+          </>
+        )}
 
         {/* Info Card */}
         <div style={{

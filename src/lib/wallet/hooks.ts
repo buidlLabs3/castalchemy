@@ -1,5 +1,5 @@
 /**
- * Hybrid wallet hooks - Farcaster + WalletConnect with manual switching
+ * Hybrid wallet hooks - Farcaster + WalletConnect with instant connection
  */
 'use client';
 
@@ -20,50 +20,56 @@ interface WalletState {
 }
 
 /**
- * Hybrid wallet hook with manual switching between Farcaster and external wallets
+ * Hybrid wallet hook with instant Farcaster detection
  */
 export function useWallet(): WalletState {
   const [farcasterAddress, setFarcasterAddress] = useState<Address | undefined>();
   const [walletMode, setWalletMode] = useState<WalletMode>(null);
-  const [isCheckingFarcaster, setIsCheckingFarcaster] = useState(true);
+  const [isCheckingFarcaster, setIsCheckingFarcaster] = useState(false);
 
   // WalletConnect state
   const { address: wcAddress, isConnected: wcIsConnected } = useAccount();
   const { disconnect: wcDisconnect } = useDisconnect();
   const { connect, connectors } = useConnect();
 
-  // Auto-detect Farcaster wallet on mount
+  // Fast Farcaster wallet detection - runs immediately, no blocking
   useEffect(() => {
+    let mounted = true;
+    
     async function detectFarcasterWallet() {
       try {
         const { sdk } = await import('@farcaster/miniapp-sdk');
+        
+        if (!mounted) return;
         
         if (sdk.wallet?.ethProvider) {
           const accounts = await sdk.wallet.ethProvider.request({
             method: 'eth_requestAccounts',
           }) as string[];
           
-          if (accounts && accounts.length > 0) {
+          if (mounted && accounts && accounts.length > 0) {
             setFarcasterAddress(accounts[0] as Address);
-            // Auto-select Farcaster if available
-            if (!walletMode) {
-              setWalletMode('farcaster');
-            }
+            setWalletMode('farcaster');
           }
         }
-      } catch (error) {
-        console.error('Failed to detect Farcaster wallet:', error);
+      } catch {
+        // Not in Farcaster, silently fail
       } finally {
-        setIsCheckingFarcaster(false);
+        if (mounted) {
+          setIsCheckingFarcaster(false);
+        }
       }
     }
 
     detectFarcasterWallet();
-  }, [walletMode]);
+    
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const switchToExternal = () => {
     setWalletMode('external');
-    // Try to connect via MetaMask/WalletConnect
     const metaMaskConnector = connectors.find((c) => c.id === 'injected' || c.id === 'metaMask');
     if (metaMaskConnector) {
       connect({ connector: metaMaskConnector });
@@ -72,7 +78,6 @@ export function useWallet(): WalletState {
 
   const switchToFarcaster = () => {
     if (farcasterAddress) {
-      // Disconnect external wallet if connected
       if (wcIsConnected) {
         wcDisconnect();
       }
