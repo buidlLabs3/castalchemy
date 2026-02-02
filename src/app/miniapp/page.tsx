@@ -55,7 +55,7 @@ export default function MiniApp() {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         provider = sdk.wallet?.ethProvider;
       } else if (typeof window !== 'undefined' && 'ethereum' in window) {
-        provider = (window as any).ethereum;
+        provider = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
       }
       
       const balanceStr = await fetchBalance(address as Address, provider);
@@ -73,6 +73,7 @@ export default function MiniApp() {
     if (address && isConnected) {
       loadBalance();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected, walletMode]);
 
   // Refresh balance after successful transaction
@@ -82,6 +83,7 @@ export default function MiniApp() {
         loadBalance();
       }, 2000);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess]);
 
   const copyAddress = () => {
@@ -161,17 +163,36 @@ export default function MiniApp() {
             textAlign: 'center',
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-              {isFarcasterAvailable ? '🎭' : '🔗'}
+              {walletMode === 'external' || !isFarcasterAvailable ? '🔗' : '🎭'}
             </div>
             <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-              {isFarcasterAvailable ? 'Connecting Farcaster Wallet...' : 'Connect Wallet'}
+              {walletMode === 'external' ? 'Connect External Wallet' : 
+               isFarcasterAvailable ? 'Connecting Farcaster Wallet...' : 
+               'Connect Wallet'}
             </h2>
-            {!isFarcasterAvailable && (
+            {(walletMode === 'external' || !isFarcasterAvailable) && (
               <>
                 <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1.5rem' }}>
-                  Connect an external wallet to continue
+                  Connect MetaMask or WalletConnect
                 </p>
                 <ConnectButton />
+                {isFarcasterAvailable && (
+                  <button
+                    onClick={switchToFarcaster}
+                    style={{
+                      marginTop: '1rem',
+                      padding: '0.75rem 1.5rem',
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.5rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ← Use Farcaster Wallet Instead
+                  </button>
+                )}
               </>
             )}
           </div>

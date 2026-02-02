@@ -4,7 +4,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAccount, useDisconnect, useConnect } from 'wagmi';
+import { useAccount, useDisconnect } from 'wagmi';
 import type { Address } from 'viem';
 
 type WalletMode = 'farcaster' | 'external' | null;
@@ -32,7 +32,6 @@ export function useWallet(): WalletState {
   // WalletConnect state
   const { address: wcAddress, isConnected: wcIsConnected } = useAccount();
   const { disconnect: wcDisconnect } = useDisconnect();
-  const { connect, connectors } = useConnect();
 
   // Fast Farcaster wallet detection - runs immediately, auto-connects
   useEffect(() => {
@@ -72,39 +71,41 @@ export function useWallet(): WalletState {
     };
   }, []);
 
-  const switchToExternal = async () => {
-    setWalletMode('external');
-    
-    // Disconnect Farcaster first if connected
+  const switchToExternal = () => {
+    // Disconnect Farcaster first
     if (farcasterAddress) {
       setFarcasterAddress(undefined);
     }
     
-    // Try MetaMask first, then WalletConnect
-    const metaMaskConnector = connectors.find((c) => c.id === 'injected' || c.id === 'metaMask');
-    const wcConnector = connectors.find((c) => c.id === 'walletConnect');
+    // Set mode to external - this will trigger UI to show ConnectButton
+    setWalletMode('external');
     
-    if (metaMaskConnector) {
-      try {
-        connect({ connector: metaMaskConnector });
-      } catch (error) {
-        console.error('MetaMask connection failed:', error);
-        // Try WalletConnect as fallback
-        if (wcConnector) {
-          connect({ connector: wcConnector });
-        }
-      }
-    } else if (wcConnector) {
-      connect({ connector: wcConnector });
-    }
+    // Don't auto-connect, let user choose via RainbowKit modal
   };
 
-  const switchToFarcaster = () => {
-    if (farcasterAddress) {
-      if (wcIsConnected) {
-        wcDisconnect();
+  const switchToFarcaster = async () => {
+    // Disconnect external wallet if connected
+    if (wcIsConnected) {
+      wcDisconnect();
+    }
+    
+    // Try to connect to Farcaster wallet
+    try {
+      const { sdk } = await import('@farcaster/miniapp-sdk');
+      
+      if (sdk.wallet?.ethProvider) {
+        const accounts = await sdk.wallet.ethProvider.request({
+          method: 'eth_requestAccounts',
+        }) as string[];
+        
+        if (accounts && accounts.length > 0) {
+          setFarcasterAddress(accounts[0] as Address);
+          setWalletMode('farcaster');
+        }
       }
-      setWalletMode('farcaster');
+    } catch (error) {
+      console.error('Failed to connect Farcaster wallet:', error);
+      setWalletMode(null);
     }
   };
 
@@ -115,6 +116,14 @@ export function useWallet(): WalletState {
     setWalletMode(null);
     setFarcasterAddress(undefined);
   };
+
+  // Update wallet mode when external wallet connects
+  useEffect(() => {
+    if (wcIsConnected && wcAddress && walletMode === 'external') {
+      // External wallet is now connected
+      setFarcasterAddress(undefined);
+    }
+  }, [wcIsConnected, wcAddress, walletMode]);
 
   return {
     address: walletMode === 'farcaster' ? farcasterAddress : wcAddress,
