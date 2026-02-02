@@ -159,12 +159,24 @@ export default function MiniApp() {
         {/* Header */}
         <div style={{
           textAlign: 'center',
-          padding: '1.5rem 1rem 1rem',
+          padding: '1.5rem 1rem 0.5rem',
         }}>
           <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⚗️</div>
           <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: 0 }}>
             CastAlchemy
           </h1>
+          <div style={{
+            display: 'inline-block',
+            marginTop: '0.5rem',
+            padding: '0.25rem 0.75rem',
+            backgroundColor: '#fbbf24',
+            color: '#000',
+            borderRadius: '0.5rem',
+            fontSize: '0.75rem',
+            fontWeight: 'bold',
+          }}>
+            🧪 Sepolia Testnet
+          </div>
         </div>
 
         {/* Wallet Card */}
@@ -303,7 +315,7 @@ export default function MiniApp() {
             opacity: 0.8,
             marginBottom: '1rem',
           }}>
-            ≈ ${balance ? (parseFloat(formatEther(balance.value)) * 2500).toFixed(2) : '0.00'} USD
+            Sepolia Testnet ETH (No real value)
           </div>
 
           {/* Send/Receive Buttons */}
@@ -476,7 +488,7 @@ export default function MiniApp() {
                   {txHash}
                 </div>
                 <a
-                  href={`https://etherscan.io/tx/${txHash}`}
+                  href={`https://sepolia.etherscan.io/tx/${txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -490,7 +502,7 @@ export default function MiniApp() {
                     fontWeight: 'bold',
                   }}
                 >
-                  View on Etherscan →
+                  View on Sepolia Etherscan →
                 </a>
               </div>
             )}
@@ -781,6 +793,19 @@ export default function MiniApp() {
           fontSize: '0.8rem',
           color: '#666',
         }}>
+          <div style={{
+            padding: '0.75rem',
+            backgroundColor: '#1a1a1a',
+            borderRadius: '0.5rem',
+            marginBottom: '0.5rem',
+          }}>
+            <div style={{ color: '#fbbf24', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+              🧪 Running on Sepolia Testnet
+            </div>
+            <div style={{ fontSize: '0.75rem' }}>
+              Get free testnet ETH from <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4ade80' }}>Sepolia Faucet</a>
+            </div>
+          </div>
           <div>Powered by Alchemix V2</div>
           <div style={{ marginTop: '0.25rem' }}>V3 Integration: Feb 6th, 2026</div>
         </div>
