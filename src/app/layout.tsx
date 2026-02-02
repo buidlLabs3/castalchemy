@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Providers } from '@/components/Providers';
 
 export const metadata: Metadata = {
   title: 'CastAlchemy - Alchemix on Farcaster',
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
     'fc:frame:image:aspect_ratio': '1.91:1',
     'fc:frame:button:1': 'Open Frame',
     'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': 'https://castalchemy.vercel.app/api/frames',
+    'fc:frame:button:1:target': 'https://castalchemy.vercel.app/miniapp',
   },
 };
 
@@ -21,7 +22,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Providers>
+          {children}
+        </Providers>
+      </body>
     </html>
   );
 }
