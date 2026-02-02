@@ -1,20 +1,29 @@
 /**
  * CastAlchemy - Unified Wallet Dashboard for Farcaster
- * All-in-one interface: Wallet + Alchemix positions + Actions
+ * Full wallet functionality: Send, Receive, Copy, Switch wallets
  */
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/lib/wallet/hooks';
-import { useBalance } from 'wagmi';
-import { formatEther } from 'viem';
+import { useBalance, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { formatEther, parseEther } from 'viem';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { Address } from 'viem';
 
 export default function MiniApp() {
   const [isReady, setIsReady] = useState(false);
+  const [showSend, setShowSend] = useState(false);
+  const [showReceive, setShowReceive] = useState(false);
+  const [showWalletSwitch, setShowWalletSwitch] = useState(false);
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
+  const [copied, setCopied] = useState(false);
   
-  const { address, isConnected, isConnecting } = useWallet();
+  const { address, isConnected, isConnecting, walletMode, switchToExternal, switchToFarcaster, disconnect } = useWallet();
   const { data: balance } = useBalance({ address: address as Address });
+  const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
   useEffect(() => {
     async function initSDK() {
@@ -29,6 +38,35 @@ export default function MiniApp() {
     }
     initSDK();
   }, []);
+
+  const copyAddress = () => {
+    if (address) {
+      navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleSend = () => {
+    if (!recipient || !amount) return;
+    
+    sendTransaction({
+      to: recipient as Address,
+      value: parseEther(amount),
+    });
+  };
+
+  const resetSend = () => {
+    setShowSend(false);
+    setRecipient('');
+    setAmount('');
+  };
+
+  useEffect(() => {
+    if (isSuccess) {
+      setTimeout(resetSend, 3000);
+    }
+  }, [isSuccess]);
 
   if (!isReady) {
     return (
@@ -91,10 +129,12 @@ export default function MiniApp() {
             backgroundColor: '#1a1a1a',
             borderRadius: '1rem',
             border: '2px solid #2a2a2a',
+            marginBottom: '1rem',
           }}>
-            <p style={{ color: '#888', fontSize: '0.9rem' }}>
-              Please open this Mini App in Farcaster to connect your wallet
+            <p style={{ color: '#888', fontSize: '0.9rem', marginBottom: '1rem' }}>
+              Connecting in Farcaster will auto-detect your wallet, or connect manually:
             </p>
+            <ConnectButton />
           </div>
         </div>
       </main>
@@ -138,9 +178,9 @@ export default function MiniApp() {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'flex-start',
-            marginBottom: '1.5rem',
+            marginBottom: '1rem',
           }}>
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ 
                 fontSize: '0.75rem', 
                 textTransform: 'uppercase', 
@@ -148,26 +188,98 @@ export default function MiniApp() {
                 opacity: 0.9,
                 marginBottom: '0.25rem',
               }}>
-                Farcaster Wallet
+                {walletMode === 'farcaster' ? '🎭 Farcaster Wallet' : '🔗 External Wallet'}
               </div>
-              <div style={{ 
-                fontFamily: 'monospace', 
-                fontSize: '0.9rem',
-                opacity: 0.9,
-              }}>
+              <div 
+                onClick={copyAddress}
+                style={{ 
+                  fontFamily: 'monospace', 
+                  fontSize: '0.9rem',
+                  opacity: 0.9,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
                 {address.slice(0, 6)}...{address.slice(-4)}
+                <span style={{ fontSize: '1rem' }}>{copied ? '✅' : '📋'}</span>
               </div>
             </div>
-            <div style={{
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              padding: '0.5rem 0.75rem',
-              borderRadius: '0.5rem',
-              fontSize: '0.8rem',
-              fontWeight: 'bold',
-            }}>
-              🎭 Connected
-            </div>
+            <button
+              onClick={() => setShowWalletSwitch(!showWalletSwitch)}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                padding: '0.5rem 0.75rem',
+                borderRadius: '0.5rem',
+                fontSize: '0.8rem',
+                fontWeight: 'bold',
+                border: 'none',
+                color: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              ⚙️ Switch
+            </button>
           </div>
+
+          {/* Wallet Switcher */}
+          {showWalletSwitch && (
+            <div style={{
+              backgroundColor: 'rgba(0,0,0,0.3)',
+              padding: '1rem',
+              borderRadius: '0.75rem',
+              marginBottom: '1rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}>
+              <button
+                onClick={switchToFarcaster}
+                disabled={walletMode === 'farcaster'}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: walletMode === 'farcaster' ? '#4ade80' : 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontWeight: 'bold',
+                  cursor: walletMode === 'farcaster' ? 'default' : 'pointer',
+                }}
+              >
+                🎭 Use Farcaster Wallet
+              </button>
+              <button
+                onClick={switchToExternal}
+                disabled={walletMode === 'external'}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: walletMode === 'external' ? '#60a5fa' : 'rgba(255,255,255,0.1)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontWeight: 'bold',
+                  cursor: walletMode === 'external' ? 'default' : 'pointer',
+                }}
+              >
+                🔗 Use External Wallet
+              </button>
+              <button
+                onClick={disconnect}
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'rgba(255,68,68,0.2)',
+                  color: '#ff4444',
+                  border: 'none',
+                  borderRadius: '0.5rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                ⚠️ Disconnect
+              </button>
+            </div>
+          )}
 
           <div style={{ marginBottom: '0.5rem' }}>
             <div style={{ 
@@ -189,10 +301,284 @@ export default function MiniApp() {
           <div style={{ 
             fontSize: '0.85rem', 
             opacity: 0.8,
+            marginBottom: '1rem',
           }}>
             ≈ ${balance ? (parseFloat(formatEther(balance.value)) * 2500).toFixed(2) : '0.00'} USD
           </div>
+
+          {/* Send/Receive Buttons */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '0.75rem',
+          }}>
+            <button
+              onClick={() => { setShowSend(true); setShowReceive(false); }}
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+              }}
+            >
+              📤 Send
+            </button>
+            <button
+              onClick={() => { setShowReceive(true); setShowSend(false); }}
+              style={{
+                padding: '0.75rem',
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+              }}
+            >
+              📥 Receive
+            </button>
+          </div>
         </div>
+
+        {/* Send Modal */}
+        {showSend && (
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '1.25rem',
+            padding: '1.5rem',
+            border: '2px solid #2a2a2a',
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem',
+            }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
+                📤 Send ETH
+              </h2>
+              <button
+                onClick={() => setShowSend(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#888',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                Recipient Address:
+              </label>
+              <input
+                type="text"
+                placeholder="0x..."
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                disabled={isPending || isConfirming}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#0f1419',
+                  color: '#fff',
+                  border: '2px solid #2a2a2a',
+                  borderRadius: '0.5rem',
+                  fontFamily: 'monospace',
+                  fontSize: '0.9rem',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                Amount (ETH):
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                placeholder="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                disabled={isPending || isConfirming}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  backgroundColor: '#0f1419',
+                  color: '#fff',
+                  border: '2px solid #2a2a2a',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.9rem',
+                }}
+              />
+            </div>
+
+            <button
+              onClick={handleSend}
+              disabled={!recipient || !amount || isPending || isConfirming}
+              style={{
+                width: '100%',
+                padding: '1rem',
+                backgroundColor: recipient && amount && !isPending && !isConfirming ? '#4ade80' : '#444',
+                color: recipient && amount && !isPending && !isConfirming ? '#000' : '#888',
+                border: 'none',
+                borderRadius: '0.5rem',
+                fontWeight: 'bold',
+                cursor: recipient && amount && !isPending && !isConfirming ? 'pointer' : 'not-allowed',
+              }}
+            >
+              {isPending ? '⏳ Confirming...' : 
+               isConfirming ? '⏳ Sending...' : 
+               isSuccess ? '✅ Sent!' : 
+               'Send Transaction'}
+            </button>
+
+            {error && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                backgroundColor: '#ff444420',
+                border: '2px solid #ff4444',
+                borderRadius: '0.5rem',
+                color: '#ff6666',
+                fontSize: '0.85rem',
+              }}>
+                ❌ {error.message}
+              </div>
+            )}
+
+            {txHash && (
+              <div style={{
+                marginTop: '1rem',
+                padding: '1rem',
+                backgroundColor: '#4ade8020',
+                border: '2px solid #4ade80',
+                borderRadius: '0.5rem',
+              }}>
+                <div style={{ color: '#4ade80', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                  ✅ Transaction Hash:
+                </div>
+                <div style={{
+                  fontFamily: 'monospace',
+                  fontSize: '0.8rem',
+                  wordBreak: 'break-all',
+                  marginBottom: '0.75rem',
+                }}>
+                  {txHash}
+                </div>
+                <a
+                  href={`https://etherscan.io/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'inline-block',
+                    padding: '0.5rem 1rem',
+                    backgroundColor: '#4ade80',
+                    color: '#000',
+                    textDecoration: 'none',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.9rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  View on Etherscan →
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Receive Modal */}
+        {showReceive && (
+          <div style={{
+            backgroundColor: '#1a1a1a',
+            borderRadius: '1.25rem',
+            padding: '1.5rem',
+            border: '2px solid #2a2a2a',
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem',
+            }}>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
+                📥 Receive ETH
+              </h2>
+              <button
+                onClick={() => setShowReceive(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#888',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                backgroundColor: '#fff',
+                padding: '1rem',
+                borderRadius: '0.75rem',
+                marginBottom: '1rem',
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${address}`}
+                  alt="QR Code"
+                  style={{ width: '200px', height: '200px' }}
+                />
+              </div>
+              
+              <div style={{
+                backgroundColor: '#0f1419',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                marginBottom: '1rem',
+              }}>
+                <div style={{ 
+                  fontFamily: 'monospace', 
+                  fontSize: '0.9rem',
+                  wordBreak: 'break-all',
+                  marginBottom: '0.75rem',
+                }}>
+                  {address}
+                </div>
+                <button
+                  onClick={copyAddress}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#4ade80',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copied ? '✅ Copied!' : '📋 Copy Address'}
+                </button>
+              </div>
+
+              <div style={{ fontSize: '0.85rem', color: '#888' }}>
+                Scan QR code or copy address to receive ETH
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Alchemix Positions */}
         <div style={{
@@ -341,7 +727,6 @@ export default function MiniApp() {
               flexDirection: 'column',
               alignItems: 'center',
               gap: '0.5rem',
-              transition: 'transform 0.2s',
             }}
           >
             <span style={{ fontSize: '1.5rem' }}>💰</span>
@@ -362,7 +747,6 @@ export default function MiniApp() {
               flexDirection: 'column',
               alignItems: 'center',
               gap: '0.5rem',
-              transition: 'transform 0.2s',
             }}
           >
             <span style={{ fontSize: '1.5rem' }}>🏦</span>
