@@ -19,7 +19,7 @@ export default function MiniApp() {
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
   
-  const { address, isConnected, walletMode, switchToExternal, switchToFarcaster, disconnect } = useWallet();
+  const { address, isConnected, walletMode, isFarcasterAvailable, switchToExternal, switchToFarcaster, disconnect } = useWallet();
   const { data: balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance } = useBalance({ 
     address: address as Address,
     chainId: 11155111, // Sepolia testnet
@@ -116,13 +116,20 @@ export default function MiniApp() {
             boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🎭</div>
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Connect Wallet</h2>
-            <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1.5rem' }}>
-              In Farcaster: Auto-connects<br />
-              Outside: Use external wallet
-            </p>
-            <ConnectButton />
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+              {isFarcasterAvailable ? '🎭' : '🔗'}
+            </div>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
+              {isFarcasterAvailable ? 'Connecting Farcaster Wallet...' : 'Connect Wallet'}
+            </h2>
+            {!isFarcasterAvailable && (
+              <>
+                <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1.5rem' }}>
+                  Connect an external wallet to continue
+                </p>
+                <ConnectButton />
+              </>
+            )}
           </div>
         ) : (
           <>

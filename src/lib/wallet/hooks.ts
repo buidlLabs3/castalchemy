@@ -14,6 +14,7 @@ interface WalletState {
   isConnected: boolean;
   isConnecting: boolean;
   walletMode: WalletMode;
+  isFarcasterAvailable: boolean;
   switchToExternal: () => void;
   switchToFarcaster: () => void;
   disconnect: () => void;
@@ -25,14 +26,15 @@ interface WalletState {
 export function useWallet(): WalletState {
   const [farcasterAddress, setFarcasterAddress] = useState<Address | undefined>();
   const [walletMode, setWalletMode] = useState<WalletMode>(null);
-  const [isCheckingFarcaster, setIsCheckingFarcaster] = useState(false);
+  const [isFarcasterAvailable, setIsFarcasterAvailable] = useState(false);
+  const [isCheckingFarcaster, setIsCheckingFarcaster] = useState(true);
 
   // WalletConnect state
   const { address: wcAddress, isConnected: wcIsConnected } = useAccount();
   const { disconnect: wcDisconnect } = useDisconnect();
   const { connect, connectors } = useConnect();
 
-  // Fast Farcaster wallet detection - runs immediately, no blocking
+  // Fast Farcaster wallet detection - runs immediately, auto-connects
   useEffect(() => {
     let mounted = true;
     
@@ -43,6 +45,8 @@ export function useWallet(): WalletState {
         if (!mounted) return;
         
         if (sdk.wallet?.ethProvider) {
+          setIsFarcasterAvailable(true);
+          
           const accounts = await sdk.wallet.ethProvider.request({
             method: 'eth_requestAccounts',
           }) as string[];
@@ -52,8 +56,8 @@ export function useWallet(): WalletState {
             setWalletMode('farcaster');
           }
         }
-      } catch {
-        // Not in Farcaster, silently fail
+      } catch (error) {
+        console.log('Not in Farcaster context:', error);
       } finally {
         if (mounted) {
           setIsCheckingFarcaster(false);
@@ -90,6 +94,7 @@ export function useWallet(): WalletState {
       wcDisconnect();
     }
     setWalletMode(null);
+    setFarcasterAddress(undefined);
   };
 
   return {
@@ -97,6 +102,7 @@ export function useWallet(): WalletState {
     isConnected: walletMode === 'farcaster' ? !!farcasterAddress : wcIsConnected,
     isConnecting: isCheckingFarcaster,
     walletMode,
+    isFarcasterAvailable,
     switchToExternal,
     switchToFarcaster,
     disconnect: handleDisconnect,

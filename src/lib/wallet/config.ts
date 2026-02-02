@@ -20,10 +20,7 @@ export const config = createConfig({
   chains: [sepolia],
   connectors: [
     injected({ target: 'metaMask' }),
-    walletConnect({ 
-      projectId,
-      showQrModal: true,
-    }),
+    walletConnect({ projectId }),
   ],
   transports: {
     [sepolia.id]: http(sepoliaRpcUrls[0], {
