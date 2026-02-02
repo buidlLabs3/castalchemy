@@ -2,7 +2,7 @@
  * Transaction helpers for Alchemix contracts
  */
 import { parseUnits, type Address, encodeFunctionData } from 'viem';
-import { getWalletProvider } from '../wallet/hooks';
+import { getFarcasterProvider } from '../wallet/hooks';
 import { ALCHEMIX_V2_VAULTS } from '../config/networks';
 
 const VAULT_ABI = [
@@ -88,7 +88,7 @@ export async function depositToAlchemix(
 
   const yieldTokenAddress = yieldToken || defaultYieldToken;
   const amountWei = parseUnits(amount, 18);
-  const provider = await getWalletProvider();
+  const provider = await getFarcasterProvider();
 
   // Step 1: Check allowance and approve if needed
   const allowanceData = encodeFunctionData({
@@ -173,7 +173,7 @@ export async function borrowFromAlchemix(
 
   const yieldTokenAddress = yieldToken || defaultYieldToken;
   const amountWei = parseUnits(amount, 18);
-  const provider = await getWalletProvider();
+  const provider = await getFarcasterProvider();
 
   const borrowData = encodeFunctionData({
     abi: VAULT_ABI,
@@ -209,7 +209,7 @@ export async function getPosition(
   const vault = ALCHEMIX_V2_VAULTS[vaultType];
   if (!vault) throw new Error('Vault not found');
 
-  const provider = await getWalletProvider();
+  const provider = await getFarcasterProvider();
 
   // Get total value (collateral)
   const totalValueData = encodeFunctionData({
