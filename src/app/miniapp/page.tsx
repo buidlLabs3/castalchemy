@@ -4,13 +4,23 @@
  */
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useWallet } from '@/lib/wallet/hooks';
 import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
-import { parseEther } from 'viem';
+import { formatEther, parseEther } from 'viem';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { Address } from 'viem';
 import { fetchBalance } from '@/lib/wallet/balance';
+import { useV3Positions, v3Config } from '@/lib/v3';
+
+function formatV3Amount(value: bigint): string {
+  return Number.parseFloat(formatEther(value)).toFixed(4);
+}
+
+function formatV3Health(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(2) : '∞';
+}
 
 export default function MiniApp() {
   const [showSend, setShowSend] = useState(false);
@@ -26,6 +36,15 @@ export default function MiniApp() {
   const { address, isConnected, walletMode, isFarcasterAvailable, switchToExternal, switchToFarcaster, disconnect } = useWallet();
   const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const {
+    positions: v3Positions,
+    isLoading: v3Loading,
+    error: v3Error,
+    isEnabled: isV3Enabled,
+    reload: reloadV3,
+  } = useV3Positions(address);
+
+  const previewPositions = v3Positions.slice(0, 2);
 
   // Fast SDK initialization - non-blocking
   useEffect(() => {
@@ -363,9 +382,14 @@ export default function MiniApp() {
                 marginBottom: '1rem',
               }}>
                 {balanceError ? (
-                  <span style={{ color: '#ff4444' }}>
-                    ⚠️ Balance fetch failed. Click 🔄 to retry
-                  </span>
+                  <div>
+                    <span style={{ color: '#ff4444' }}>
+                      ⚠️ {balanceError}
+                    </span>
+                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                      Click 🔄 to retry or check console
+                    </div>
+                  </div>
                 ) : (
                   'Sepolia Testnet ETH (No real value)'
                 )}
@@ -652,123 +676,198 @@ export default function MiniApp() {
               padding: '1.5rem',
               border: '2px solid #2a2a2a',
             }}>
-              <h2 style={{ 
-                fontSize: '1.2rem', 
-                fontWeight: 'bold', 
-                marginBottom: '1rem',
+              <div style={{
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: '0.5rem',
+                gap: '0.75rem',
+                marginBottom: '1rem',
+                flexWrap: 'wrap',
               }}>
-                <span>💎</span> Alchemix Positions
-              </h2>
-
-              {/* alUSD Vault */}
-              <div style={{
-                backgroundColor: '#0f1419',
-                borderRadius: '0.75rem',
-                padding: '1rem',
-                marginBottom: '0.75rem',
-                border: '1px solid #2a2a2a',
-              }}>
-                <div style={{
+                <h2 style={{ 
+                  fontSize: '1.2rem', 
+                  fontWeight: 'bold', 
+                  margin: 0,
                   display: 'flex',
-                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: '0.75rem',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      backgroundColor: '#4ade80',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1rem',
-                    }}>
-                      $
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 'bold' }}>alUSD Vault</div>
-                      <div style={{ fontSize: '0.75rem', color: '#888' }}>Stablecoin</div>
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Deposited</div>
-                    <div style={{ fontWeight: 'bold', color: '#4ade80' }}>$0.00</div>
-                  </div>
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
                   gap: '0.5rem',
-                  fontSize: '0.85rem',
                 }}>
-                  <div>
-                    <div style={{ color: '#888' }}>Borrowed</div>
-                    <div style={{ fontWeight: 'bold' }}>$0.00</div>
-                  </div>
-                  <div>
-                    <div style={{ color: '#888' }}>Available</div>
-                    <div style={{ fontWeight: 'bold', color: '#4ade80' }}>$0.00</div>
-                  </div>
-                </div>
+                  <span>💎</span> Alchemix Positions
+                </h2>
+                <Link
+                  href="/miniapp/v3"
+                  style={{
+                    padding: '0.6rem 0.9rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Open V3 →
+                </Link>
               </div>
 
-              {/* alETH Vault */}
-              <div style={{
-                backgroundColor: '#0f1419',
-                borderRadius: '0.75rem',
-                padding: '1rem',
-                border: '1px solid #2a2a2a',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '0.75rem',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '50%',
-                      backgroundColor: '#60a5fa',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1rem',
-                    }}>
-                      Ξ
-                    </div>
+              {isV3Enabled ? (
+                <>
+                  <div style={{
+                    backgroundColor: '#0f1419',
+                    borderRadius: '0.75rem',
+                    padding: '1rem',
+                    marginBottom: '0.75rem',
+                    border: '1px solid #2a2a2a',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    flexWrap: 'wrap',
+                  }}>
                     <div>
-                      <div style={{ fontWeight: 'bold' }}>alETH Vault</div>
-                      <div style={{ fontSize: '0.75rem', color: '#888' }}>Ethereum</div>
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>V3 Preview</div>
+                      <div style={{ fontWeight: 'bold' }}>
+                        {v3Loading ? 'Loading positions...' : `${v3Positions.length} position${v3Positions.length === 1 ? '' : 's'}`}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                        Mode: {v3Config.mode} on chain {v3Config.chainId}
+                      </div>
                     </div>
+                    <button
+                      onClick={reloadV3}
+                      disabled={v3Loading}
+                      style={{
+                        padding: '0.75rem 1rem',
+                        backgroundColor: v3Loading ? '#444' : '#4ade80',
+                        color: v3Loading ? '#888' : '#000',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: v3Loading ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Refresh
+                    </button>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: '#888' }}>Deposited</div>
-                    <div style={{ fontWeight: 'bold', color: '#60a5fa' }}>0.0000 ETH</div>
-                  </div>
-                </div>
+
+                  {v3Error ? (
+                    <div style={{
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      backgroundColor: '#ff444420',
+                      border: '1px solid #ff4444',
+                      color: '#ff8a8a',
+                      fontSize: '0.85rem',
+                    }}>
+                      ⚠️ {v3Error}
+                    </div>
+                  ) : previewPositions.length > 0 ? (
+                    <>
+                      {previewPositions.map((position) => (
+                        <div
+                          key={position.tokenId.toString()}
+                          style={{
+                            backgroundColor: '#0f1419',
+                            borderRadius: '0.75rem',
+                            padding: '1rem',
+                            marginBottom: '0.75rem',
+                            border: '1px solid #2a2a2a',
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '0.75rem',
+                            gap: '0.75rem',
+                            flexWrap: 'wrap',
+                          }}>
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>Position #{position.tokenId.toString()}</div>
+                              <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                                Available credit: {formatV3Amount(position.availableCredit)}
+                              </div>
+                            </div>
+                            <div style={{
+                              padding: '0.25rem 0.6rem',
+                              borderRadius: '999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 'bold',
+                              textTransform: 'uppercase',
+                              backgroundColor:
+                                position.healthState === 'safe'
+                                  ? 'rgba(74,222,128,0.16)'
+                                  : position.healthState === 'watch'
+                                    ? 'rgba(251,191,36,0.16)'
+                                    : 'rgba(248,113,113,0.16)',
+                              color:
+                                position.healthState === 'safe'
+                                  ? '#86efac'
+                                  : position.healthState === 'watch'
+                                    ? '#fcd34d'
+                                    : '#fca5a5',
+                            }}>
+                              {position.healthState}
+                            </div>
+                          </div>
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '0.5rem',
+                            fontSize: '0.85rem',
+                          }}>
+                            <div>
+                              <div style={{ color: '#888' }}>Collateral</div>
+                              <div style={{ fontWeight: 'bold' }}>{formatV3Amount(position.collateral)}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#888' }}>Debt</div>
+                              <div style={{ fontWeight: 'bold' }}>{formatV3Amount(position.debt)}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#888' }}>Max Borrow</div>
+                              <div style={{ fontWeight: 'bold' }}>{formatV3Amount(position.maxBorrowable)}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#888' }}>Health</div>
+                              <div style={{ fontWeight: 'bold' }}>{formatV3Health(position.healthFactor)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {v3Positions.length > previewPositions.length && (
+                        <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                          Showing the first {previewPositions.length} positions. Open V3 for the full list.
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{
+                      padding: '1rem',
+                      borderRadius: '0.75rem',
+                      backgroundColor: '#0f1419',
+                      border: '1px solid #2a2a2a',
+                      color: '#888',
+                      fontSize: '0.85rem',
+                    }}>
+                      No V3 positions found yet. Open the V3 screen to start with the new position-based flow.
+                    </div>
+                  )}
+                </>
+              ) : (
                 <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: '0.5rem',
+                  padding: '1rem',
+                  borderRadius: '0.75rem',
+                  backgroundColor: '#0f1419',
+                  border: '1px solid #2a2a2a',
+                  color: '#888',
                   fontSize: '0.85rem',
+                  lineHeight: 1.6,
                 }}>
-                  <div>
-                    <div style={{ color: '#888' }}>Borrowed</div>
-                    <div style={{ fontWeight: 'bold' }}>0.0000 ETH</div>
-                  </div>
-                  <div>
-                    <div style={{ color: '#888' }}>Available</div>
-                    <div style={{ fontWeight: 'bold', color: '#60a5fa' }}>0.0000 ETH</div>
-                  </div>
+                  V3 preview is available but currently disabled. Set `NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true` to load the
+                  new tokenId-based position flow.
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Quick Actions */}
@@ -778,7 +877,7 @@ export default function MiniApp() {
               gap: '0.75rem',
             }}>
               <button
-                onClick={() => alert('Deposit functionality coming with Alchemix V3 on Feb 6th!')}
+                onClick={() => alert('Use the V3 Positions card to preview the new deposit flow.')}
                 style={{
                   padding: '1.25rem',
                   backgroundColor: '#4ade80',
@@ -798,7 +897,7 @@ export default function MiniApp() {
                 Deposit
               </button>
               <button
-                onClick={() => alert('Borrow functionality coming with Alchemix V3 on Feb 6th!')}
+                onClick={() => alert('Borrow flow will be added on top of the V3 position model next.')}
                 style={{
                   padding: '1.25rem',
                   backgroundColor: '#60a5fa',
@@ -834,10 +933,10 @@ export default function MiniApp() {
             💡 How it works
           </div>
           <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.6 }}>
-            <li>Deposit collateral (DAI, USDC, ETH)</li>
-            <li>Borrow up to 50% as alUSD/alETH</li>
-            <li>Your debt auto-repays from yield</li>
-            <li>Withdraw anytime (V3 coming Feb 6th)</li>
+            <li>Connect a Farcaster or external wallet</li>
+            <li>V3 positions are tokenId-based and can be multiple per wallet</li>
+            <li>Preview positions now, then wire deposit and borrow flows on top</li>
+            <li>Final contract addresses stay behind config until launch</li>
           </ul>
         </div>
 
@@ -861,8 +960,8 @@ export default function MiniApp() {
               Get free testnet ETH from <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4ade80' }}>Sepolia Faucet</a>
             </div>
           </div>
-          <div>Powered by Alchemix V2</div>
-          <div style={{ marginTop: '0.25rem' }}>V3 Integration: Feb 6th, 2026</div>
+          <div>Powered by CastAlchemy Preview</div>
+          <div style={{ marginTop: '0.25rem' }}>V3 Integration: In Progress</div>
         </div>
       </div>
     </main>
