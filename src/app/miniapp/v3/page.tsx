@@ -34,7 +34,7 @@ function parseAmountInput(value: string): bigint | null {
 
 export default function MiniAppV3PreviewPage() {
   const searchParams = useSearchParams();
-  const { address, isConnected, walletMode } = useWallet();
+  const { address, isConnected, isConnecting, walletMode } = useWallet();
   const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address);
   const { sendTransaction, data: txHash, error: sendError, isPending: isSending } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
@@ -48,6 +48,7 @@ export default function MiniAppV3PreviewPage() {
   const [txLabel, setTxLabel] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [mockSubmissionId, setMockSubmissionId] = useState<string | null>(null);
 
   const requestedAction = searchParams.get('action');
   const preferredAction =
@@ -87,6 +88,12 @@ export default function MiniAppV3PreviewPage() {
     !!preparedTx &&
     v3Config.mode === 'contracts' &&
     preparedTx.to !== ZERO_ADDRESS;
+  const canSimulatePreparedTx = !!preparedTx && v3Config.mode === 'mock';
+  const walletSummary = isConnecting
+    ? 'Checking...'
+    : isConnected && address
+      ? `${address.slice(0, 6)}...${address.slice(-4)}`
+      : 'Not connected';
 
   useEffect(() => {
     if (!positions.length) {
@@ -104,6 +111,10 @@ export default function MiniAppV3PreviewPage() {
       reload();
     }
   }, [isSuccess, reload]);
+
+  useEffect(() => {
+    setMockSubmissionId(null);
+  }, [preparedTx]);
 
   const prepareTransaction = async (
     label: string,
@@ -313,6 +324,15 @@ export default function MiniAppV3PreviewPage() {
     });
   };
 
+  const handleSimulatePreparedTransaction = () => {
+    if (!preparedTx) {
+      return;
+    }
+
+    setTxError(null);
+    setMockSubmissionId(`mock-${Date.now().toString(36)}`);
+  };
+
   return (
     <main
       style={{
@@ -386,9 +406,7 @@ export default function MiniAppV3PreviewPage() {
           </div>
           <div>
             <div style={{ fontSize: '0.75rem', opacity: 0.7 }}>Wallet</div>
-            <div style={{ fontWeight: 700 }}>
-              {isConnected && address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not connected'}
-            </div>
+            <div style={{ fontWeight: 700 }}>{walletSummary}</div>
           </div>
         </div>
 
@@ -407,7 +425,22 @@ export default function MiniAppV3PreviewPage() {
           </div>
         )}
 
-        {isEnabled && !isConnected && (
+        {isEnabled && isConnecting && (
+          <div
+            style={{
+              backgroundColor: 'rgba(96,165,250,0.12)',
+              border: '1px solid rgba(96,165,250,0.3)',
+              color: '#93c5fd',
+              borderRadius: '1rem',
+              padding: '1rem',
+              lineHeight: 1.5,
+            }}
+          >
+            Checking wallet connection before loading positions.
+          </div>
+        )}
+
+        {isEnabled && !isConnecting && !isConnected && (
           <div
             style={{
               backgroundColor: 'rgba(96,165,250,0.12)',
@@ -605,6 +638,11 @@ export default function MiniAppV3PreviewPage() {
                   </option>
                 ))}
               </select>
+              {positions.length === 1 && (
+                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#888' }}>
+                  This wallet currently has one position in the loaded dataset, so the selector will not change yet.
+                </div>
+              )}
               {selectedPosition ? (
                 <div
                   style={{
@@ -960,30 +998,55 @@ export default function MiniAppV3PreviewPage() {
                     border: '1px solid rgba(255,255,255,0.05)',
                   }}
                 >
-                  <button
-                    onClick={handleSendPreparedTransaction}
-                    disabled={!canSubmitPreparedTx || isSending || isConfirming}
-                    style={{
-                      width: '100%',
-                      padding: '0.95rem',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      backgroundColor:
-                        !canSubmitPreparedTx || isSending || isConfirming ? '#444' : '#fbbf24',
-                      color:
-                        !canSubmitPreparedTx || isSending || isConfirming ? '#999' : '#1a1201',
-                      fontWeight: 700,
-                      cursor:
-                        !canSubmitPreparedTx || isSending || isConfirming ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {isSending ? 'Awaiting Wallet Confirmation...' :
-                     isConfirming ? 'Submitting Transaction...' :
-                     isSuccess ? 'Transaction Submitted' :
-                     'Send with Connected Wallet'}
-                  </button>
+                  {canSimulatePreparedTx ? (
+                    <button
+                      onClick={handleSimulatePreparedTransaction}
+                      disabled={!!mockSubmissionId}
+                      style={{
+                        width: '100%',
+                        padding: '0.95rem',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        backgroundColor: mockSubmissionId ? '#444' : '#fbbf24',
+                        color: mockSubmissionId ? '#999' : '#1a1201',
+                        fontWeight: 700,
+                        cursor: mockSubmissionId ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {mockSubmissionId ? 'Mock Submission Complete' : 'Simulate Submit in Mock Mode'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleSendPreparedTransaction}
+                      disabled={!canSubmitPreparedTx || isSending || isConfirming}
+                      style={{
+                        width: '100%',
+                        padding: '0.95rem',
+                        border: 'none',
+                        borderRadius: '0.75rem',
+                        backgroundColor:
+                          !canSubmitPreparedTx || isSending || isConfirming ? '#444' : '#fbbf24',
+                        color:
+                          !canSubmitPreparedTx || isSending || isConfirming ? '#999' : '#1a1201',
+                        fontWeight: 700,
+                        cursor:
+                          !canSubmitPreparedTx || isSending || isConfirming ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {isSending ? 'Awaiting Wallet Confirmation...' :
+                       isConfirming ? 'Submitting Transaction...' :
+                       isSuccess ? 'Transaction Submitted' :
+                       'Send with Connected Wallet'}
+                    </button>
+                  )}
 
-                  {!canSubmitPreparedTx && (
+                  {canSimulatePreparedTx && (
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: '#888' }}>
+                      Mock mode does not send a real transaction. This simulates the last step so you can test the UI flow.
+                    </div>
+                  )}
+
+                  {!canSimulatePreparedTx && !canSubmitPreparedTx && (
                     <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: '#888' }}>
                       External wallet mode plus contract-backed V3 config is required for signing in this preview.
                     </div>
@@ -1027,6 +1090,20 @@ export default function MiniAppV3PreviewPage() {
                       >
                         View on Etherscan
                       </a>
+                    </div>
+                  )}
+
+                  {mockSubmissionId && (
+                    <div
+                      style={{
+                        marginTop: '0.75rem',
+                        display: 'grid',
+                        gap: '0.5rem',
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      <div style={{ color: '#86efac', fontWeight: 700 }}>Mock Submission ID</div>
+                      <div style={{ wordBreak: 'break-all' }}>{mockSubmissionId}</div>
                     </div>
                   )}
                 </div>

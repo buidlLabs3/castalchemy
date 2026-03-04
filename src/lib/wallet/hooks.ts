@@ -24,6 +24,7 @@ interface WalletState {
  * Hybrid wallet hook with instant Farcaster detection
  */
 export function useWallet(): WalletState {
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [farcasterAddress, setFarcasterAddress] = useState<Address | undefined>();
   const [walletMode, setWalletMode] = useState<WalletMode>(null);
   const [isFarcasterAvailable, setIsFarcasterAvailable] = useState(false);
@@ -32,6 +33,10 @@ export function useWallet(): WalletState {
   // WalletConnect state
   const { address: wcAddress, isConnected: wcIsConnected } = useAccount();
   const { disconnect: wcDisconnect } = useDisconnect();
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   // Fast Farcaster wallet detection - runs immediately, auto-connects
   useEffect(() => {
@@ -125,12 +130,18 @@ export function useWallet(): WalletState {
     }
   }, [wcIsConnected, wcAddress, walletMode]);
 
+  const resolvedWalletMode = hasHydrated ? walletMode : null;
+  const resolvedAddress =
+    !hasHydrated ? undefined : resolvedWalletMode === 'farcaster' ? farcasterAddress : wcAddress;
+  const resolvedIsConnected =
+    !hasHydrated ? false : resolvedWalletMode === 'farcaster' ? !!farcasterAddress : wcIsConnected;
+
   return {
-    address: walletMode === 'farcaster' ? farcasterAddress : wcAddress,
-    isConnected: walletMode === 'farcaster' ? !!farcasterAddress : wcIsConnected,
-    isConnecting: isCheckingFarcaster,
-    walletMode,
-    isFarcasterAvailable,
+    address: resolvedAddress,
+    isConnected: resolvedIsConnected,
+    isConnecting: !hasHydrated || isCheckingFarcaster,
+    walletMode: resolvedWalletMode,
+    isFarcasterAvailable: hasHydrated ? isFarcasterAvailable : false,
     switchToExternal,
     switchToFarcaster,
     disconnect: handleDisconnect,

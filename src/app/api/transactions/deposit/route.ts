@@ -1,59 +1,24 @@
 /**
- * Transaction endpoint for deposits
- * Returns transaction data for Frame transaction buttons
+ * V3 transaction endpoint for deposits.
+ * Non-frame callers can request the same prepared transaction shape
+ * used by the frame and mini app flows.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAlchemixClient } from '@/lib/contracts/alchemix';
+import { buildV3DepositTransactionResponse } from '@/lib/v3';
 import { formatError } from '@/lib/utils/errors';
-import type { VaultType } from '@/types';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const vaultType = searchParams.get('vault') as VaultType;
-    const amountStr = searchParams.get('amount') || '0';
-
-    if (!vaultType || !['alUSD', 'alETH'].includes(vaultType)) {
-      return NextResponse.json(
-        { error: 'Invalid vault type' },
-        { status: 400 },
-      );
-    }
-
-    const amount = BigInt(amountStr);
-    if (amount <= 0n) {
-      return NextResponse.json(
-        { error: 'Invalid amount' },
-        { status: 400 },
-      );
-    }
-
-    // TODO: Get user address from Farcaster frame context
-    const userAddress = '0x0000000000000000000000000000000000000000' as `0x${string}`;
-
-    const client = getAlchemixClient(vaultType);
-    const tx = await client.prepareDeposit(vaultType, amount, userAddress);
-
-    return NextResponse.json({
-      chainId: `eip155:${client.getChainId()}`,
-      method: 'eth_sendTransaction',
-      params: {
-        abi: [],
-        to: tx.to,
-        data: tx.data,
-        value: tx.value.toString(),
-      },
-    });
+    return NextResponse.json(await buildV3DepositTransactionResponse(request.nextUrl.searchParams));
   } catch (error) {
-    console.error('Error preparing deposit transaction:', error);
+    console.error('Error preparing V3 deposit transaction:', error);
     return NextResponse.json(
       { error: formatError(error) },
-      { status: 500 },
+      { status: 400 },
     );
   }
 }
-

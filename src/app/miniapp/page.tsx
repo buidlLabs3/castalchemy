@@ -33,7 +33,16 @@ export default function MiniApp() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   
-  const { address, isConnected, walletMode, isFarcasterAvailable, switchToExternal, switchToFarcaster, disconnect } = useWallet();
+  const {
+    address,
+    isConnected,
+    isConnecting,
+    walletMode,
+    isFarcasterAvailable,
+    switchToExternal,
+    switchToFarcaster,
+    disconnect,
+  } = useWallet();
   const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
   const {
@@ -183,14 +192,15 @@ export default function MiniApp() {
             textAlign: 'center',
           }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-              {walletMode === 'external' || !isFarcasterAvailable ? '🔗' : '🎭'}
+              {isConnecting ? '⏳' : walletMode === 'external' || !isFarcasterAvailable ? '🔗' : '🎭'}
             </div>
             <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-              {walletMode === 'external' ? 'Connect External Wallet' : 
+              {isConnecting ? 'Checking Wallet...' :
+               walletMode === 'external' ? 'Connect External Wallet' : 
                isFarcasterAvailable ? 'Connecting Farcaster Wallet...' : 
                'Connect Wallet'}
             </h2>
-            {(walletMode === 'external' || !isFarcasterAvailable) && (
+            {!isConnecting && (walletMode === 'external' || !isFarcasterAvailable) && (
               <>
                 <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1.5rem' }}>
                   Connect MetaMask or WalletConnect
@@ -214,6 +224,11 @@ export default function MiniApp() {
                   </button>
                 )}
               </>
+            )}
+            {isConnecting && (
+              <p style={{ fontSize: '0.9rem', opacity: 0.9, margin: 0 }}>
+                Resolving wallet state before loading the dashboard.
+              </p>
             )}
           </div>
         ) : (
