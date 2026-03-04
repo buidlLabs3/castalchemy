@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import { formatEther, parseEther } from 'viem';
 import { useWallet } from '@/lib/wallet/hooks';
 import { getV3Adapter, useV3Positions, v3Config, ZERO_ADDRESS } from '@/lib/v3';
@@ -33,7 +32,6 @@ function parseAmountInput(value: string): bigint | null {
 }
 
 export default function MiniAppV3PreviewPage() {
-  const searchParams = useSearchParams();
   const { address, isConnected, isConnecting, walletMode } = useWallet();
   const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address);
   const { sendTransaction, data: txHash, error: sendError, isPending: isSending } = useSendTransaction();
@@ -49,8 +47,8 @@ export default function MiniAppV3PreviewPage() {
   const [txError, setTxError] = useState<string | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
   const [mockSubmissionId, setMockSubmissionId] = useState<string | null>(null);
+  const [requestedAction, setRequestedAction] = useState<string | null>(null);
 
-  const requestedAction = searchParams.get('action');
   const preferredAction =
     requestedAction === 'withdraw' ||
     requestedAction === 'borrow' ||
@@ -111,6 +109,15 @@ export default function MiniAppV3PreviewPage() {
       reload();
     }
   }, [isSuccess, reload]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const nextAction = new URLSearchParams(window.location.search).get('action');
+    setRequestedAction(nextAction);
+  }, []);
 
   useEffect(() => {
     setMockSubmissionId(null);
