@@ -13,6 +13,17 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import type { Address } from 'viem';
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useV3Positions, v3Config } from '@/lib/v3';
+import {
+  formatMarketDelta,
+  formatMarketPercent,
+  formatMarketUsd,
+  getMarketSnapshots,
+} from '@/lib/market/snapshots';
+import {
+  getEducationLesson,
+  getNextEducationStep,
+  getPreviousEducationStep,
+} from '@/lib/education/lessons';
 
 function formatV3Amount(value: bigint): string {
   return Number.parseFloat(formatEther(value)).toFixed(4);
@@ -32,6 +43,7 @@ export default function MiniApp() {
   const [balance, setBalance] = useState<string | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [lessonStep, setLessonStep] = useState(1);
   
   const {
     address,
@@ -54,6 +66,8 @@ export default function MiniApp() {
   } = useV3Positions(address);
 
   const previewPositions = v3Positions.slice(0, 2);
+  const marketSnapshots = getMarketSnapshots();
+  const activeLesson = getEducationLesson(lessonStep);
 
   // Fast SDK initialization - non-blocking
   useEffect(() => {
@@ -883,6 +897,260 @@ export default function MiniApp() {
                   new tokenId-based position flow.
                 </div>
               )}
+            </div>
+
+            {/* Learning Path */}
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '1rem',
+              padding: '1rem',
+              border: '2px solid #2a2a2a',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.75rem',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                <h2 style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}>
+                  <span>🧠</span> Learning Path
+                </h2>
+                <a
+                  href={`/api/education?step=${activeLesson.step}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '0.6rem 0.9rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Lesson API
+                </a>
+              </div>
+
+              <div style={{
+                backgroundColor: '#0f1419',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                border: '1px solid #2a2a2a',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  marginBottom: '0.75rem',
+                  flexWrap: 'wrap',
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                      Lesson {activeLesson.step} of {activeLesson.totalSteps}
+                    </div>
+                    <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{activeLesson.title}</div>
+                  </div>
+                  <div style={{
+                    padding: '0.25rem 0.6rem',
+                    borderRadius: '999px',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    backgroundColor: 'rgba(192,132,252,0.16)',
+                    color: '#d8b4fe',
+                  }}>
+                    tutorial
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '0.9rem', color: '#d1d5db', lineHeight: 1.6, marginBottom: '0.75rem' }}>
+                  {activeLesson.summary}
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gap: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: '#9ca3af',
+                  marginBottom: '0.9rem',
+                }}>
+                  {activeLesson.bullets.map((bullet) => (
+                    <div key={bullet}>• {bullet}</div>
+                  ))}
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  flexWrap: 'wrap',
+                }}>
+                  <button
+                    onClick={() => setLessonStep(getPreviousEducationStep(activeLesson.step))}
+                    disabled={activeLesson.step === 1}
+                    style={{
+                      flex: '1 1 120px',
+                      padding: '0.75rem',
+                      backgroundColor: activeLesson.step === 1 ? '#444' : '#374151',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '0.75rem',
+                      fontWeight: 'bold',
+                      cursor: activeLesson.step === 1 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() =>
+                      setLessonStep(
+                        activeLesson.step === activeLesson.totalSteps
+                          ? 1
+                          : getNextEducationStep(activeLesson.step),
+                      )
+                    }
+                    style={{
+                      flex: '1 1 120px',
+                      padding: '0.75rem',
+                      backgroundColor: '#c084fc',
+                      color: '#1f1330',
+                      border: 'none',
+                      borderRadius: '0.75rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {activeLesson.step === activeLesson.totalSteps ? 'Restart' : 'Next Lesson'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Market Snapshot */}
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '1rem',
+              padding: '1rem',
+              border: '2px solid #2a2a2a',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.75rem',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                <h2 style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}>
+                  <span>📈</span> Market Snapshot
+                </h2>
+                <a
+                  href="/api/market"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '0.6rem 0.9rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  API Preview
+                </a>
+              </div>
+              <div style={{
+                display: 'grid',
+                gap: '0.75rem',
+              }}>
+                {marketSnapshots.map((snapshot) => (
+                  <div
+                    key={snapshot.symbol}
+                    style={{
+                      backgroundColor: '#0f1419',
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      border: '1px solid #2a2a2a',
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      marginBottom: '0.75rem',
+                      flexWrap: 'wrap',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>{snapshot.label}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#888' }}>{snapshot.note}</div>
+                      </div>
+                      <div style={{
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '999px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        backgroundColor:
+                          snapshot.trend === 'up'
+                            ? 'rgba(74,222,128,0.16)'
+                            : snapshot.trend === 'down'
+                              ? 'rgba(248,113,113,0.16)'
+                              : 'rgba(96,165,250,0.16)',
+                        color:
+                          snapshot.trend === 'up'
+                            ? '#86efac'
+                            : snapshot.trend === 'down'
+                              ? '#fca5a5'
+                              : '#93c5fd',
+                      }}>
+                        {snapshot.trend}
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                      gap: '0.75rem',
+                      fontSize: '0.85rem',
+                    }}>
+                      <div>
+                        <div style={{ color: '#888' }}>Current APY</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatMarketPercent(snapshot.currentApy)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#888' }}>7d Change</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatMarketDelta(snapshot.apyDelta7d)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#888' }}>Utilization</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatMarketPercent(snapshot.utilization)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#888' }}>TVL</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatMarketUsd(snapshot.tvlUsd)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Quick Actions */}

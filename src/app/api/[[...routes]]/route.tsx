@@ -8,6 +8,17 @@ import { Button, Frog, TextInput, type FrameContext, type TransactionContext } f
 import { handle } from 'frog/next';
 import { formatEther, isAddress, type Address } from 'viem';
 import {
+  getEducationLesson,
+  getNextEducationStep,
+  getPreviousEducationStep,
+} from '@/lib/education/lessons';
+import {
+  formatMarketDelta,
+  formatMarketPercent,
+  formatMarketUsd,
+  getMarketSnapshot,
+} from '@/lib/market/snapshots';
+import {
   assertV3Borrowable,
   assertV3DebtAmount,
   assertV3Withdrawable,
@@ -90,6 +101,22 @@ function renderCard(title: string, lines: string[], accent = '#60a5fa') {
       ))}
     </div>
   );
+}
+
+function getTrendAccent(symbol: 'alUSD' | 'alETH') {
+  return symbol === 'alUSD' ? '#4ade80' : '#60a5fa';
+}
+
+function getLessonActionTarget(label: string) {
+  switch (label) {
+    case 'Open Positions':
+      return '/frames/dashboard';
+    case 'Review Borrow':
+      return '/frames/dashboard';
+    case 'Review Deposit':
+    default:
+      return '/frames/deposit';
+  }
 }
 
 function renderDisabledFrame(message: string) {
@@ -336,16 +363,91 @@ app.frame('/frames', (c) => {
     image: renderCard('CastAlchemy V3', [
       'Frames now use the shared V3 adapter.',
       detail,
-      'Use Deposit to build a transaction or My Positions to manage tokenId-based positions.',
+      'Use Deposit, Analytics, Learn, or My Positions to explore the current preview.',
     ]),
     intents: [
       <Button key="deposit" action="/frames/deposit">
         Deposit
       </Button>,
+      <Button key="analytics" action="/frames/analytics">
+        Analytics
+      </Button>,
+      <Button key="learn" action="/frames/learn">
+        Learn
+      </Button>,
       <Button key="positions" action="/frames/dashboard">
         My Positions
       </Button>,
-      <Button.Redirect key="miniapp" location="/miniapp/v3">
+    ],
+  });
+});
+
+app.frame('/frames/learn', (c) => {
+  const lesson = getEducationLesson(getSearchParam(c, 'step'));
+  const previousStep = getPreviousEducationStep(lesson.step);
+  const nextStep = getNextEducationStep(lesson.step);
+
+  return c.res({
+    image: renderCard(`Learn ${lesson.step}/${lesson.totalSteps}`, [
+      lesson.title,
+      lesson.summary,
+      lesson.bullets[0],
+      lesson.bullets[1],
+      lesson.bullets[2],
+    ], '#c084fc'),
+    intents: [
+      lesson.step > 1 ? (
+        <Button key="prev" action={`/frames/learn?step=${previousStep}`}>
+          Prev
+        </Button>
+      ) : (
+        <Button key="home" action="/frames">
+          Home
+        </Button>
+      ),
+      lesson.step < lesson.totalSteps ? (
+        <Button key="next" action={`/frames/learn?step=${nextStep}`}>
+          Next
+        </Button>
+      ) : (
+        <Button key="restart" action="/frames/learn?step=1">
+          Restart
+        </Button>
+      ),
+      <Button key="action" action={getLessonActionTarget(lesson.actionLabel)}>
+        {lesson.actionLabel}
+      </Button>,
+      <Button.Redirect key="miniapp" location="/miniapp">
+        Mini App
+      </Button.Redirect>,
+    ],
+  });
+});
+
+app.frame('/frames/analytics', (c) => {
+  const market = getMarketSnapshot(getSearchParam(c, 'market'));
+  const nextSymbol = market.symbol === 'alUSD' ? 'alETH' : 'alUSD';
+
+  return c.res({
+    image: renderCard('Market Analytics', [
+      `${market.label} APY: ${formatMarketPercent(market.currentApy)}`,
+      `7d: ${formatMarketDelta(market.apyDelta7d)} | 30d: ${formatMarketDelta(market.apyDelta30d)}`,
+      `Utilization: ${formatMarketPercent(market.utilization)}`,
+      `TVL: ${formatMarketUsd(market.tvlUsd)}`,
+      `1 unit projected yearly yield: ${market.projectedAnnualYieldOnOneUnit.toFixed(4)}`,
+      market.note,
+    ], getTrendAccent(market.symbol)),
+    intents: [
+      <Button key="switch" action={`/frames/analytics?market=${nextSymbol}`}>
+        View {nextSymbol}
+      </Button>,
+      <Button key="deposit" action="/frames/deposit">
+        Deposit
+      </Button>,
+      <Button key="positions" action="/frames/dashboard">
+        Positions
+      </Button>,
+      <Button.Redirect key="miniapp" location="/miniapp">
         Mini App
       </Button.Redirect>,
     ],

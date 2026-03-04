@@ -2,16 +2,21 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 
+const appUrl = process.env.VERCEL_URL
+  ? `https://${process.env.VERCEL_URL}`
+  : process.env.NEXT_PUBLIC_APP_URL || 'https://castalchemy.vercel.app';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(appUrl),
   title: 'CastAlchemy - Alchemix on Farcaster',
   description: 'Self-repaying loans via Frames, Cast Actions, and bots',
   other: {
     'fc:frame': 'vNext',
-    'fc:frame:image': 'https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy',
+    'fc:frame:image': `${appUrl}/frame-cover.svg`,
     'fc:frame:image:aspect_ratio': '1.91:1',
-    'fc:frame:button:1': 'Open Frame',
+    'fc:frame:button:1': 'Open Mini App',
     'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': 'https://castalchemy.vercel.app/miniapp',
+    'fc:frame:button:1:target': `${appUrl}/miniapp`,
   },
 };
 
@@ -30,4 +35,3 @@ export default function RootLayout({
     </html>
   );
 }
-
