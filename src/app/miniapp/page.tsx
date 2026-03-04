@@ -1,18 +1,17 @@
-/**
- * CastAlchemy - Unified Wallet Dashboard for Farcaster
- * Optimized for instant loading - no lag!
- */
 'use client';
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useWallet } from '@/lib/wallet/hooks';
-import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
-import { formatEther, parseEther } from 'viem';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import type { Address } from 'viem';
-import { fetchBalance } from '@/lib/wallet/balance';
-import { useV3Positions, v3Config } from '@/lib/v3';
+import { formatEther, parseEther, type Address } from 'viem';
+import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import styles from './page.module.css';
+import { getBotBriefing, type BotBriefingKind } from '@/lib/automation/briefings';
+import {
+  getEducationLesson,
+  getNextEducationStep,
+  getPreviousEducationStep,
+} from '@/lib/education/lessons';
 import {
   formatMarketDelta,
   formatMarketPercent,
@@ -20,31 +19,43 @@ import {
   getMarketSnapshots,
 } from '@/lib/market/snapshots';
 import {
-  getEducationLesson,
-  getNextEducationStep,
-  getPreviousEducationStep,
-} from '@/lib/education/lessons';
-import { getBotBriefing, type BotBriefingKind } from '@/lib/automation/briefings';
-import {
   formatSocialPercent,
   formatSocialUsd,
   getSocialPreview,
   type LeaderboardWindow,
   type SocialPrivacyMode,
 } from '@/lib/social/preview';
+import {
+  formatTipAssetAmount,
+  formatTipUsd,
+  getTipAssetOptions,
+  getTipConversionPreview,
+  type TipAsset,
+} from '@/lib/social/tips';
+import { useV3Positions, v3Config } from '@/lib/v3';
+import { fetchBalance } from '@/lib/wallet/balance';
+import { useWallet } from '@/lib/wallet/hooks';
 
-function formatV3Amount(value: bigint): string {
+type FinancePanel = 'overview' | 'send' | 'receive';
+
+function formatTokenAmount(value: bigint): string {
   return Number.parseFloat(formatEther(value)).toFixed(4);
 }
 
-function formatV3Health(value: number): string {
-  return Number.isFinite(value) ? value.toFixed(2) : '∞';
+function formatHealth(value: number): string {
+  return Number.isFinite(value) ? value.toFixed(2) : 'INF';
+}
+
+function shortenAddress(address?: string): string {
+  if (!address) {
+    return 'Not connected';
+  }
+
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
 export default function MiniApp() {
-  const [showSend, setShowSend] = useState(false);
-  const [showReceive, setShowReceive] = useState(false);
-  const [showWalletSwitch, setShowWalletSwitch] = useState(false);
+  const [financePanel, setFinancePanel] = useState<FinancePanel>('overview');
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
@@ -57,7 +68,9 @@ export default function MiniApp() {
   const [leaderboardWindow, setLeaderboardWindow] = useState<LeaderboardWindow>('weekly');
   const [socialPrivacyMode, setSocialPrivacyMode] = useState<SocialPrivacyMode>('public');
   const [socialComparisonEnabled, setSocialComparisonEnabled] = useState(true);
-  
+  const [tipAsset, setTipAsset] = useState<TipAsset>('USDC');
+  const [tipAmount, setTipAmount] = useState('25');
+
   const {
     address,
     isConnected,
@@ -78,10 +91,9 @@ export default function MiniApp() {
     reload: reloadV3,
   } = useV3Positions(address);
 
-  const previewPositions = v3Positions.slice(0, 2);
-  const marketSnapshots = getMarketSnapshots();
   const activeLesson = getEducationLesson(lessonStep);
-  const previewHealthState = previewPositions[0]?.healthState ?? 'safe';
+  const previewPosition = v3Positions[0] ?? null;
+  const previewHealthState = previewPosition?.healthState ?? 'safe';
   const activeBriefing = getBotBriefing(briefingKind, {
     healthState: previewHealthState,
     progress: milestoneProgress,
@@ -91,50 +103,65 @@ export default function MiniApp() {
     privacyMode: socialPrivacyMode,
     socialComparisonEnabled,
   });
+  const tipOptions = getTipAssetOptions();
+  const tipPreview = getTipConversionPreview({
+    asset: tipAsset,
+    amount: tipAmount,
+  });
+  const connectedWalletLabel = isConnecting
+    ? 'Checking wallet'
+    : isConnected && address
+      ? shortenAddress(address)
+      : 'Connect wallet';
 
-  // Fast SDK initialization - non-blocking
   useEffect(() => {
     async function initSDK() {
       try {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         sdk.actions.ready();
       } catch {
-        // Not in Farcaster, silently fail
+        // Outside Farcaster, keep the page usable.
       }
     }
+
     initSDK();
   }, []);
 
-  // Custom balance fetcher that works with Farcaster wallet
   const loadBalance = async () => {
-    if (!address) return;
-    
+    if (!address) {
+      return;
+    }
+
     setBalanceLoading(true);
     setBalanceError(null);
-    
+
     try {
-      let provider: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } | undefined;
-      
-      // Get provider based on wallet mode
+      let provider:
+        | { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }
+        | undefined;
+
       if (walletMode === 'farcaster') {
         const { sdk } = await import('@farcaster/miniapp-sdk');
         provider = sdk.wallet?.ethProvider;
       } else if (typeof window !== 'undefined' && 'ethereum' in window) {
-        const win = window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } };
+        const win = window as {
+          ethereum?: {
+            request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+          };
+        };
         provider = win.ethereum;
       }
-      
-      const balanceStr = await fetchBalance(address as Address, provider);
-      setBalance(balanceStr);
-    } catch (error) {
-      console.error('Failed to load balance:', error);
-      setBalanceError('Failed to load balance');
+
+      const nextBalance = await fetchBalance(address as Address, provider);
+      setBalance(nextBalance);
+    } catch (nextError) {
+      console.error('Failed to load balance:', nextError);
+      setBalanceError('Balance unavailable');
     } finally {
       setBalanceLoading(false);
     }
   };
 
-  // Load balance when address or wallet mode changes
   useEffect(() => {
     if (address && isConnected) {
       loadBalance();
@@ -142,1554 +169,646 @@ export default function MiniApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected, walletMode]);
 
-  // Refresh balance after successful transaction
   useEffect(() => {
-    if (isSuccess) {
-      setTimeout(() => {
-        loadBalance();
-      }, 2000);
+    if (!isSuccess) {
+      return;
     }
+
+    const timer = setTimeout(() => {
+      loadBalance();
+      setRecipient('');
+      setAmount('');
+      setFinancePanel('overview');
+    }, 1800);
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess]);
 
-  const copyAddress = () => {
-    if (address) {
-      navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const copyAddress = async () => {
+    if (!address) {
+      return;
     }
+
+    await navigator.clipboard.writeText(address);
+    setCopied(true);
+
+    window.setTimeout(() => {
+      setCopied(false);
+    }, 1600);
   };
 
   const handleSend = () => {
-    if (!recipient || !amount) return;
-    
+    if (!recipient || !amount) {
+      return;
+    }
+
     sendTransaction({
       to: recipient as Address,
       value: parseEther(amount),
     });
   };
 
-  const resetSend = () => {
-    setShowSend(false);
-    setRecipient('');
-    setAmount('');
-  };
-
-  useEffect(() => {
-    if (isSuccess) {
-      setTimeout(resetSend, 3000);
-    }
-  }, [isSuccess]);
+  const financeStatus = isPending
+    ? 'Sending transfer...'
+    : isConfirming
+      ? 'Waiting for confirmation...'
+      : isSuccess
+        ? 'Transfer confirmed.'
+        : error
+          ? error.message
+          : null;
 
   return (
-    <main style={{
-      minHeight: '100vh',
-      backgroundColor: '#0a0a0a',
-      color: '#fff',
-      padding: '1rem',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-    }}>
-      <div style={{
-        maxWidth: '600px',
-        margin: '0 auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '1rem',
-      }}>
-        {/* Header */}
-        <div style={{
-          textAlign: 'center',
-          padding: '1.5rem 1rem 0.5rem',
-        }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>⚗️</div>
-          <h1 style={{ fontSize: '1.8rem', fontWeight: 'bold', margin: 0 }}>
-            CastAlchemy
-          </h1>
-          <div style={{
-            display: 'inline-block',
-            marginTop: '0.5rem',
-            padding: '0.25rem 0.75rem',
-            backgroundColor: '#fbbf24',
-            color: '#000',
-            borderRadius: '0.5rem',
-            fontSize: '0.75rem',
-            fontWeight: 'bold',
-          }}>
-            🧪 Sepolia Testnet
-          </div>
-        </div>
-
-        {/* Wallet Card - Shows immediately */}
-        {!isConnected || !address ? (
-          <div style={{
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            borderRadius: '1.25rem',
-            padding: '1.5rem',
-            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
-            textAlign: 'center',
-          }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>
-              {isConnecting ? '⏳' : walletMode === 'external' || !isFarcasterAvailable ? '🔗' : '🎭'}
-            </div>
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-              {isConnecting ? 'Checking Wallet...' :
-               walletMode === 'external' ? 'Connect External Wallet' : 
-               isFarcasterAvailable ? 'Connecting Farcaster Wallet...' : 
-               'Connect Wallet'}
-            </h2>
-            {!isConnecting && (walletMode === 'external' || !isFarcasterAvailable) && (
-              <>
-                <p style={{ fontSize: '0.9rem', opacity: 0.9, marginBottom: '1.5rem' }}>
-                  Connect MetaMask or WalletConnect
-                </p>
-                <ConnectButton />
-                {isFarcasterAvailable && (
-                  <button
-                    onClick={switchToFarcaster}
-                    style={{
-                      marginTop: '1rem',
-                      padding: '0.75rem 1.5rem',
-                      backgroundColor: 'rgba(255,255,255,0.2)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ← Use Farcaster Wallet Instead
-                  </button>
-                )}
-              </>
-            )}
-            {isConnecting && (
-              <p style={{ fontSize: '0.9rem', opacity: 0.9, margin: 0 }}>
-                Resolving wallet state before loading the dashboard.
+    <main className={styles.page}>
+      <div className={styles.shell}>
+        <section className={styles.hero}>
+          <div className={styles.heroRow}>
+            <div>
+              <div className={styles.badgeRow}>
+                <span className={styles.brandBadge}>Alchemix x Farcaster</span>
+                <span className={styles.networkBadge}>Sepolia preview</span>
+              </div>
+              <h1 className={styles.heroTitle}>CastAlchemy</h1>
+              <p className={styles.heroSubtitle}>
+                A cleaner, contract-light dashboard focused on the flows we can ship before V3
+                contracts land.
               </p>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* Wallet Card */}
-            <div style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '1.25rem',
-              padding: '1.5rem',
-              boxShadow: '0 8px 32px rgba(102, 126, 234, 0.2)',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                marginBottom: '1rem',
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ 
-                    fontSize: '0.75rem', 
-                    textTransform: 'uppercase', 
-                    letterSpacing: '0.05em',
-                    opacity: 0.9,
-                    marginBottom: '0.25rem',
-                  }}>
-                    {walletMode === 'farcaster' ? '🎭 Farcaster Wallet' : '🔗 External Wallet'}
-                  </div>
-                  <div 
-                    onClick={copyAddress}
-                    style={{ 
-                      fontFamily: 'monospace', 
-                      fontSize: '0.9rem',
-                      opacity: 0.9,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                    }}
-                  >
-                    {address.slice(0, 6)}...{address.slice(-4)}
-                    <span style={{ fontSize: '1rem' }}>{copied ? '✅' : '📋'}</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowWalletSwitch(!showWalletSwitch)}
-                  style={{
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '0.5rem',
-                    fontSize: '0.8rem',
-                    fontWeight: 'bold',
-                    border: 'none',
-                    color: '#fff',
-                    cursor: 'pointer',
-                  }}
-                >
-                  ⚙️ Switch
-                </button>
-              </div>
-
-              {/* Wallet Switcher */}
-              {showWalletSwitch && (
-                <div style={{
-                  backgroundColor: 'rgba(0,0,0,0.3)',
-                  padding: '1rem',
-                  borderRadius: '0.75rem',
-                  marginBottom: '1rem',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                }}>
-                  <button
-                    onClick={switchToFarcaster}
-                    disabled={walletMode === 'farcaster'}
-                    style={{
-                      padding: '0.75rem',
-                      backgroundColor: walletMode === 'farcaster' ? '#4ade80' : 'rgba(255,255,255,0.1)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontWeight: 'bold',
-                      cursor: walletMode === 'farcaster' ? 'default' : 'pointer',
-                    }}
-                  >
-                    🎭 Use Farcaster Wallet
-                  </button>
-                  <button
-                    onClick={switchToExternal}
-                    disabled={walletMode === 'external'}
-                    style={{
-                      padding: '0.75rem',
-                      backgroundColor: walletMode === 'external' ? '#60a5fa' : 'rgba(255,255,255,0.1)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontWeight: 'bold',
-                      cursor: walletMode === 'external' ? 'default' : 'pointer',
-                    }}
-                  >
-                    🔗 Use External Wallet
-                  </button>
-                  <button
-                    onClick={disconnect}
-                    style={{
-                      padding: '0.75rem',
-                      backgroundColor: 'rgba(255,68,68,0.2)',
-                      color: '#ff4444',
-                      border: 'none',
-                      borderRadius: '0.5rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ⚠️ Disconnect
-                  </button>
-                </div>
-              )}
-
-              <div style={{ marginBottom: '0.5rem' }}>
-                <div style={{ 
-                  fontSize: '0.85rem', 
-                  opacity: 0.9,
-                  marginBottom: '0.25rem',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}>
-                  <span>Total Balance</span>
-                  <button
-                    onClick={() => loadBalance()}
-                    disabled={balanceLoading}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#fff',
-                      cursor: balanceLoading ? 'not-allowed' : 'pointer',
-                      fontSize: '1rem',
-                      padding: '0.25rem',
-                      opacity: balanceLoading ? 0.5 : 1,
-                    }}
-                    title="Refresh balance"
-                  >
-                    🔄
-                  </button>
-                </div>
-                <div style={{ 
-                  fontSize: '2.5rem', 
-                  fontWeight: 'bold',
-                  letterSpacing: '-0.02em',
-                }}>
-                  {balanceLoading ? (
-                    <span style={{ fontSize: '1.5rem', opacity: 0.6 }}>Loading...</span>
-                  ) : balanceError ? (
-                    <span style={{ fontSize: '1rem', color: '#ff4444' }}>Error</span>
-                  ) : balance ? (
-                    `${parseFloat(balance).toFixed(4)} ETH`
-                  ) : (
-                    '0.0000 ETH'
-                  )}
-                </div>
-              </div>
-              
-              <div style={{ 
-                fontSize: '0.85rem', 
-                opacity: 0.8,
-                marginBottom: '1rem',
-              }}>
-                {balanceError ? (
-                  <div>
-                    <span style={{ color: '#ff4444' }}>
-                      ⚠️ {balanceError}
-                    </span>
-                    <div style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                      Click 🔄 to retry or check console
-                    </div>
-                  </div>
-                ) : (
-                  'Sepolia Testnet ETH (No real value)'
-                )}
-              </div>
-
-              {/* Send/Receive Buttons */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '0.75rem',
-              }}>
-                <button
-                  onClick={() => { setShowSend(true); setShowReceive(false); }}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  📤 Send
-                </button>
-                <button
-                  onClick={() => { setShowReceive(true); setShowSend(false); }}
-                  style={{
-                    padding: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                    fontSize: '0.9rem',
-                  }}
-                >
-                  📥 Receive
-                </button>
-              </div>
             </div>
+            <div className={styles.heroWallet}>
+              <span className={styles.walletLabel}>Active wallet</span>
+              <strong>{connectedWalletLabel}</strong>
+              <span className={styles.walletHint}>
+                {walletMode === 'farcaster'
+                  ? 'Using Farcaster wallet'
+                  : walletMode === 'external'
+                    ? 'Using external wallet'
+                    : 'Choose Farcaster or external'}
+              </span>
+            </div>
+          </div>
 
-            {/* Send Modal */}
-            {showSend && (
-              <div style={{
-                backgroundColor: '#1a1a1a',
-                borderRadius: '1.25rem',
-                padding: '1.5rem',
-                border: '2px solid #2a2a2a',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1rem',
-                }}>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
-                    📤 Send ETH
+          <div className={styles.metrics}>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>V3 mode</span>
+              <strong>{v3Config.mode}</strong>
+              <span className={styles.metricFoot}>
+                {isV3Enabled ? 'Feature flag enabled' : 'Feature flag disabled'}
+              </span>
+            </div>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Positions</span>
+              <strong>{v3Positions.length}</strong>
+              <span className={styles.metricFoot}>
+                {previewPosition ? `Watching #${previewPosition.tokenId}` : 'No preview positions yet'}
+              </span>
+            </div>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Tip-ready</span>
+              <strong>{tipPreview.asset}</strong>
+              <span className={styles.metricFoot}>
+                {formatTipAssetAmount(tipPreview.asset, tipPreview.normalizedAmount)} selected
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {!isConnected || !address ? (
+          <section className={styles.stack}>
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <p className={styles.eyebrow}>Wallet setup</p>
+                  <h2 className={styles.panelTitle}>
+                    {isConnecting ? 'Checking wallet providers' : 'Choose how to connect'}
                   </h2>
-                  <button
-                    onClick={() => setShowSend(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#888',
-                      fontSize: '1.5rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                    Recipient Address:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="0x..."
-                    value={recipient}
-                    onChange={(e) => setRecipient(e.target.value)}
-                    disabled={isPending || isConfirming}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      backgroundColor: '#0f1419',
-                      color: '#fff',
-                      border: '2px solid #2a2a2a',
-                      borderRadius: '0.5rem',
-                      fontFamily: 'monospace',
-                      fontSize: '0.9rem',
-                    }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', color: '#888', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                    Amount (ETH):
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    placeholder="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    disabled={isPending || isConfirming}
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem',
-                      backgroundColor: '#0f1419',
-                      color: '#fff',
-                      border: '2px solid #2a2a2a',
-                      borderRadius: '0.5rem',
-                      fontSize: '0.9rem',
-                    }}
-                  />
-                </div>
-
-                <button
-                  onClick={handleSend}
-                  disabled={!recipient || !amount || isPending || isConfirming}
-                  style={{
-                    width: '100%',
-                    padding: '1rem',
-                    backgroundColor: recipient && amount && !isPending && !isConfirming ? '#4ade80' : '#444',
-                    color: recipient && amount && !isPending && !isConfirming ? '#000' : '#888',
-                    border: 'none',
-                    borderRadius: '0.5rem',
-                    fontWeight: 'bold',
-                    cursor: recipient && amount && !isPending && !isConfirming ? 'pointer' : 'not-allowed',
-                  }}
-                >
-                  {isPending ? '⏳ Confirming...' : 
-                   isConfirming ? '⏳ Sending...' : 
-                   isSuccess ? '✅ Sent!' : 
-                   'Send Transaction'}
-                </button>
-
-                {error && (
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    backgroundColor: '#ff444420',
-                    border: '2px solid #ff4444',
-                    borderRadius: '0.5rem',
-                    color: '#ff6666',
-                    fontSize: '0.85rem',
-                  }}>
-                    ❌ {error.message}
-                  </div>
-                )}
-
-                {txHash && (
-                  <div style={{
-                    marginTop: '1rem',
-                    padding: '1rem',
-                    backgroundColor: '#4ade8020',
-                    border: '2px solid #4ade80',
-                    borderRadius: '0.5rem',
-                  }}>
-                    <div style={{ color: '#4ade80', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                      ✅ Transaction Hash:
-                    </div>
-                    <div style={{
-                      fontFamily: 'monospace',
-                      fontSize: '0.8rem',
-                      wordBreak: 'break-all',
-                      marginBottom: '0.75rem',
-                    }}>
-                      {txHash}
-                    </div>
-                    <a
-                      href={`https://sepolia.etherscan.io/tx/${txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: 'inline-block',
-                        padding: '0.5rem 1rem',
-                        backgroundColor: '#4ade80',
-                        color: '#000',
-                        textDecoration: 'none',
-                        borderRadius: '0.5rem',
-                        fontSize: '0.9rem',
-                        fontWeight: 'bold',
-                      }}
-                    >
-                      View on Sepolia Etherscan →
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Receive Modal */}
-            {showReceive && (
-              <div style={{
-                backgroundColor: '#1a1a1a',
-                borderRadius: '1.25rem',
-                padding: '1.5rem',
-                border: '2px solid #2a2a2a',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '1rem',
-                }}>
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0 }}>
-                    📥 Receive ETH
-                  </h2>
-                  <button
-                    onClick={() => setShowReceive(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#888',
-                      fontSize: '1.5rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    backgroundColor: '#fff',
-                    padding: '1rem',
-                    borderRadius: '0.75rem',
-                    marginBottom: '1rem',
-                  }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${address}`}
-                      alt="QR Code"
-                      style={{ width: '200px', height: '200px' }}
-                    />
-                  </div>
-                  
-                  <div style={{
-                    backgroundColor: '#0f1419',
-                    padding: '1rem',
-                    borderRadius: '0.5rem',
-                    marginBottom: '1rem',
-                  }}>
-                    <div style={{ 
-                      fontFamily: 'monospace', 
-                      fontSize: '0.9rem',
-                      wordBreak: 'break-all',
-                      marginBottom: '0.75rem',
-                    }}>
-                      {address}
-                    </div>
-                    <button
-                      onClick={copyAddress}
-                      style={{
-                        padding: '0.75rem 1.5rem',
-                        backgroundColor: '#4ade80',
-                        color: '#000',
-                        border: 'none',
-                        borderRadius: '0.5rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {copied ? '✅ Copied!' : '📋 Copy Address'}
-                    </button>
-                  </div>
-
-                  <div style={{ fontSize: '0.85rem', color: '#888' }}>
-                    Scan QR code or copy address to receive ETH
-                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Alchemix Positions */}
-            <div style={{
-              backgroundColor: '#1a1a1a',
-              borderRadius: '1.25rem',
-              padding: '1.5rem',
-              border: '2px solid #2a2a2a',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '0.75rem',
-                marginBottom: '1rem',
-                flexWrap: 'wrap',
-              }}>
-                <h2 style={{ 
-                  fontSize: '1.2rem', 
-                  fontWeight: 'bold', 
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  <span>💎</span> Alchemix Positions
-                </h2>
-                <Link
-                  href="/miniapp/v3"
-                  style={{
-                    padding: '0.6rem 0.9rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Open V3 →
-                </Link>
-              </div>
-
-              {isV3Enabled ? (
-                <>
-                  <div style={{
-                    backgroundColor: '#0f1419',
-                    borderRadius: '0.75rem',
-                    padding: '1rem',
-                    marginBottom: '0.75rem',
-                    border: '1px solid #2a2a2a',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    flexWrap: 'wrap',
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#888' }}>V3 Preview</div>
-                      <div style={{ fontWeight: 'bold' }}>
-                        {v3Loading ? 'Loading positions...' : `${v3Positions.length} position${v3Positions.length === 1 ? '' : 's'}`}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                        Mode: {v3Config.mode} on chain {v3Config.chainId}
-                      </div>
-                    </div>
-                    <button
-                      onClick={reloadV3}
-                      disabled={v3Loading}
-                      style={{
-                        padding: '0.75rem 1rem',
-                        backgroundColor: v3Loading ? '#444' : '#4ade80',
-                        color: v3Loading ? '#888' : '#000',
-                        border: 'none',
-                        borderRadius: '0.75rem',
-                        fontWeight: 'bold',
-                        cursor: v3Loading ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      Refresh
-                    </button>
-                  </div>
-
-                  {v3Error ? (
-                    <div style={{
-                      padding: '1rem',
-                      borderRadius: '0.75rem',
-                      backgroundColor: '#ff444420',
-                      border: '1px solid #ff4444',
-                      color: '#ff8a8a',
-                      fontSize: '0.85rem',
-                    }}>
-                      ⚠️ {v3Error}
-                    </div>
-                  ) : previewPositions.length > 0 ? (
-                    <>
-                      {previewPositions.map((position) => (
-                        <div
-                          key={position.tokenId.toString()}
-                          style={{
-                            backgroundColor: '#0f1419',
-                            borderRadius: '0.75rem',
-                            padding: '1rem',
-                            marginBottom: '0.75rem',
-                            border: '1px solid #2a2a2a',
-                          }}
-                        >
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            marginBottom: '0.75rem',
-                            gap: '0.75rem',
-                            flexWrap: 'wrap',
-                          }}>
-                            <div>
-                              <div style={{ fontWeight: 'bold' }}>Position #{position.tokenId.toString()}</div>
-                              <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                                Available credit: {formatV3Amount(position.availableCredit)}
-                              </div>
-                            </div>
-                            <div style={{
-                              padding: '0.25rem 0.6rem',
-                              borderRadius: '999px',
-                              fontSize: '0.75rem',
-                              fontWeight: 'bold',
-                              textTransform: 'uppercase',
-                              backgroundColor:
-                                position.healthState === 'safe'
-                                  ? 'rgba(74,222,128,0.16)'
-                                  : position.healthState === 'watch'
-                                    ? 'rgba(251,191,36,0.16)'
-                                    : 'rgba(248,113,113,0.16)',
-                              color:
-                                position.healthState === 'safe'
-                                  ? '#86efac'
-                                  : position.healthState === 'watch'
-                                    ? '#fcd34d'
-                                    : '#fca5a5',
-                            }}>
-                              {position.healthState}
-                            </div>
-                          </div>
-                          <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr 1fr',
-                            gap: '0.5rem',
-                            fontSize: '0.85rem',
-                          }}>
-                            <div>
-                              <div style={{ color: '#888' }}>Collateral</div>
-                              <div style={{ fontWeight: 'bold' }}>{formatV3Amount(position.collateral)}</div>
-                            </div>
-                            <div>
-                              <div style={{ color: '#888' }}>Debt</div>
-                              <div style={{ fontWeight: 'bold' }}>{formatV3Amount(position.debt)}</div>
-                            </div>
-                            <div>
-                              <div style={{ color: '#888' }}>Max Borrow</div>
-                              <div style={{ fontWeight: 'bold' }}>{formatV3Amount(position.maxBorrowable)}</div>
-                            </div>
-                            <div>
-                              <div style={{ color: '#888' }}>Health</div>
-                              <div style={{ fontWeight: 'bold' }}>{formatV3Health(position.healthFactor)}</div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {v3Positions.length > previewPositions.length && (
-                        <div style={{ fontSize: '0.8rem', color: '#888' }}>
-                          Showing the first {previewPositions.length} positions. Open V3 for the full list.
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div style={{
-                      padding: '1rem',
-                      borderRadius: '0.75rem',
-                      backgroundColor: '#0f1419',
-                      border: '1px solid #2a2a2a',
-                      color: '#888',
-                      fontSize: '0.85rem',
-                    }}>
-                      No V3 positions found yet. Open the V3 screen to start with the new position-based flow.
-                    </div>
-                  )}
-                </>
+              {isConnecting ? (
+                <div className={styles.callout}>
+                  We are resolving Farcaster context and external wallet availability before showing
+                  actions.
+                </div>
               ) : (
-                <div style={{
-                  padding: '1rem',
-                  borderRadius: '0.75rem',
-                  backgroundColor: '#0f1419',
-                  border: '1px solid #2a2a2a',
-                  color: '#888',
-                  fontSize: '0.85rem',
-                  lineHeight: 1.6,
-                }}>
-                  V3 preview is available but currently disabled. Set `NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true` to load the
-                  new tokenId-based position flow.
-                </div>
-              )}
-            </div>
-
-            {/* Automation Preview */}
-            <div style={{
-              backgroundColor: '#1a1a1a',
-              borderRadius: '1rem',
-              padding: '1rem',
-              border: '2px solid #2a2a2a',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                <h2 style={{
-                  fontSize: '1.2rem',
-                  fontWeight: 'bold',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  <span>🤖</span> Bot Preview
-                </h2>
-                <a
-                  href={`/api/bot?kind=${briefingKind}${briefingKind === 'health' ? `&health=${previewHealthState}` : ''}${
-                    briefingKind === 'milestone' ? `&progress=${milestoneProgress}` : ''
-                  }`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    padding: '0.6rem 0.9rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Bot API
-                </a>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                {(['daily', 'health', 'milestone'] as BotBriefingKind[]).map((kind) => (
-                  <button
-                    key={kind}
-                    onClick={() => setBriefingKind(kind)}
-                    style={{
-                      flex: '1 1 100px',
-                      padding: '0.7rem',
-                      backgroundColor: briefingKind === kind ? '#60a5fa' : '#0f1419',
-                      color: briefingKind === kind ? '#03141d' : '#fff',
-                      border: '1px solid #2a2a2a',
-                      borderRadius: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {kind}
-                  </button>
-                ))}
-              </div>
-
-              {briefingKind === 'milestone' && (
-                <div style={{
-                  display: 'flex',
-                  gap: '0.5rem',
-                  marginBottom: '0.75rem',
-                  flexWrap: 'wrap',
-                }}>
-                  {[25, 50, 75, 100].map((value) => (
-                    <button
-                      key={value}
-                      onClick={() => setMilestoneProgress(value)}
-                      style={{
-                        flex: '1 1 80px',
-                        padding: '0.6rem',
-                        backgroundColor: milestoneProgress === value ? '#fbbf24' : '#0f1419',
-                        color: milestoneProgress === value ? '#1a1201' : '#fff',
-                        border: '1px solid #2a2a2a',
-                        borderRadius: '0.75rem',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {value}%
+                <>
+                  <div className={styles.walletActions}>
+                    <div className={styles.walletConnect}>
+                      <ConnectButton />
+                    </div>
+                    {isFarcasterAvailable && (
+                      <button className={styles.secondaryButton} onClick={switchToFarcaster}>
+                        Use Farcaster wallet
+                      </button>
+                    )}
+                    <button className={styles.ghostButton} onClick={switchToExternal}>
+                      External wallet mode
                     </button>
-                  ))}
-                </div>
+                  </div>
+                  <div className={styles.gridTwo}>
+                    <div className={styles.infoTile}>
+                      <span className={styles.infoLabel}>Live now</span>
+                      <strong>Frames + analytics</strong>
+                      <p>Market, education, alerts, and social preview work without final V3.</p>
+                    </div>
+                    <div className={styles.infoTile}>
+                      <span className={styles.infoLabel}>On deck</span>
+                      <strong>Tip-to-invest + referrals</strong>
+                      <p>We can keep shipping social and wallet flows while contracts stay private.</p>
+                    </div>
+                  </div>
+                </>
               )}
-
-              <div style={{
-                backgroundColor: '#0f1419',
-                borderRadius: '0.75rem',
-                padding: '1rem',
-                border: '1px solid #2a2a2a',
-              }}>
-                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>
-                  {activeBriefing.kind} scenario
+            </section>
+          </section>
+        ) : (
+          <section className={styles.stack}>
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <p className={styles.eyebrow}>Wallet desk</p>
+                  <h2 className={styles.panelTitle}>Account overview</h2>
                 </div>
-                <div style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.5rem' }}>
-                  {activeBriefing.headline}
-                </div>
-                <div style={{ color: '#d1d5db', lineHeight: 1.6, marginBottom: '0.75rem', fontSize: '0.9rem' }}>
-                  {activeBriefing.summary}
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gap: '0.5rem',
-                  fontSize: '0.85rem',
-                  color: '#9ca3af',
-                  marginBottom: '0.9rem',
-                }}>
-                  {activeBriefing.lines.map((line) => (
-                    <div key={line}>• {line}</div>
-                  ))}
-                </div>
-                <div style={{
-                  padding: '0.65rem 0.8rem',
-                  borderRadius: '0.75rem',
-                  backgroundColor: 'rgba(255,255,255,0.04)',
-                  color: '#d1d5db',
-                  fontSize: '0.85rem',
-                }}>
-                  Suggested CTA: <strong>{activeBriefing.cta}</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* Learning Path */}
-            <div style={{
-              backgroundColor: '#1a1a1a',
-              borderRadius: '1rem',
-              padding: '1rem',
-              border: '2px solid #2a2a2a',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                <h2 style={{
-                  fontSize: '1.2rem',
-                  fontWeight: 'bold',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  <span>🧠</span> Learning Path
-                </h2>
-                <a
-                  href={`/api/education?step=${activeLesson.step}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    padding: '0.6rem 0.9rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Lesson API
-                </a>
-              </div>
-
-              <div style={{
-                backgroundColor: '#0f1419',
-                borderRadius: '0.75rem',
-                padding: '1rem',
-                border: '1px solid #2a2a2a',
-              }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  marginBottom: '0.75rem',
-                  flexWrap: 'wrap',
-                }}>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                      Lesson {activeLesson.step} of {activeLesson.totalSteps}
-                    </div>
-                    <div style={{ fontWeight: 'bold', fontSize: '1rem' }}>{activeLesson.title}</div>
-                  </div>
-                  <div style={{
-                    padding: '0.25rem 0.6rem',
-                    borderRadius: '999px',
-                    fontSize: '0.75rem',
-                    fontWeight: 'bold',
-                    backgroundColor: 'rgba(192,132,252,0.16)',
-                    color: '#d8b4fe',
-                  }}>
-                    tutorial
-                  </div>
-                </div>
-
-                <div style={{ fontSize: '0.9rem', color: '#d1d5db', lineHeight: 1.6, marginBottom: '0.75rem' }}>
-                  {activeLesson.summary}
-                </div>
-
-                <div style={{
-                  display: 'grid',
-                  gap: '0.5rem',
-                  fontSize: '0.85rem',
-                  color: '#9ca3af',
-                  marginBottom: '0.9rem',
-                }}>
-                  {activeLesson.bullets.map((bullet) => (
-                    <div key={bullet}>• {bullet}</div>
-                  ))}
-                </div>
-
-                <div style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  flexWrap: 'wrap',
-                }}>
-                  <button
-                    onClick={() => setLessonStep(getPreviousEducationStep(activeLesson.step))}
-                    disabled={activeLesson.step === 1}
-                    style={{
-                      flex: '1 1 120px',
-                      padding: '0.75rem',
-                      backgroundColor: activeLesson.step === 1 ? '#444' : '#374151',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: activeLesson.step === 1 ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() =>
-                      setLessonStep(
-                        activeLesson.step === activeLesson.totalSteps
-                          ? 1
-                          : getNextEducationStep(activeLesson.step),
-                      )
-                    }
-                    style={{
-                      flex: '1 1 120px',
-                      padding: '0.75rem',
-                      backgroundColor: '#c084fc',
-                      color: '#1f1330',
-                      border: 'none',
-                      borderRadius: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {activeLesson.step === activeLesson.totalSteps ? 'Restart' : 'Next Lesson'}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Market Snapshot */}
-            <div style={{
-              backgroundColor: '#1a1a1a',
-              borderRadius: '1rem',
-              padding: '1rem',
-              border: '2px solid #2a2a2a',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                <h2 style={{
-                  fontSize: '1.2rem',
-                  fontWeight: 'bold',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  <span>📈</span> Market Snapshot
-                </h2>
-                <a
-                  href="/api/market"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    padding: '0.6rem 0.9rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  API Preview
-                </a>
-              </div>
-              <div style={{
-                display: 'grid',
-                gap: '0.75rem',
-              }}>
-                {marketSnapshots.map((snapshot) => (
-                  <div
-                    key={snapshot.symbol}
-                    style={{
-                      backgroundColor: '#0f1419',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      border: '1px solid #2a2a2a',
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      marginBottom: '0.75rem',
-                      flexWrap: 'wrap',
-                    }}>
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>{snapshot.label}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#888' }}>{snapshot.note}</div>
-                      </div>
-                      <div style={{
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        backgroundColor:
-                          snapshot.trend === 'up'
-                            ? 'rgba(74,222,128,0.16)'
-                            : snapshot.trend === 'down'
-                              ? 'rgba(248,113,113,0.16)'
-                              : 'rgba(96,165,250,0.16)',
-                        color:
-                          snapshot.trend === 'up'
-                            ? '#86efac'
-                            : snapshot.trend === 'down'
-                              ? '#fca5a5'
-                              : '#93c5fd',
-                      }}>
-                        {snapshot.trend}
-                      </div>
-                    </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                      gap: '0.75rem',
-                      fontSize: '0.85rem',
-                    }}>
-                      <div>
-                        <div style={{ color: '#888' }}>Current APY</div>
-                        <div style={{ fontWeight: 'bold' }}>{formatMarketPercent(snapshot.currentApy)}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#888' }}>7d Change</div>
-                        <div style={{ fontWeight: 'bold' }}>{formatMarketDelta(snapshot.apyDelta7d)}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#888' }}>Utilization</div>
-                        <div style={{ fontWeight: 'bold' }}>{formatMarketPercent(snapshot.utilization)}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#888' }}>TVL</div>
-                        <div style={{ fontWeight: 'bold' }}>{formatMarketUsd(snapshot.tvlUsd)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Social Preview */}
-            <div style={{
-              backgroundColor: '#1a1a1a',
-              borderRadius: '1rem',
-              padding: '1rem',
-              border: '2px solid #2a2a2a',
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.75rem',
-                gap: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                <h2 style={{
-                  fontSize: '1.2rem',
-                  fontWeight: 'bold',
-                  margin: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                }}>
-                  <span>🏆</span> Social Preview
-                </h2>
-                <a
-                  href={`/api/social?window=${leaderboardWindow}&privacy=${socialPrivacyMode}&compare=${
-                    socialComparisonEnabled ? 'on' : 'off'
-                  }`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    padding: '0.6rem 0.9rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    textDecoration: 'none',
-                    fontSize: '0.85rem',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  Social API
-                </a>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                {(['weekly', 'monthly'] as LeaderboardWindow[]).map((window) => (
-                  <button
-                    key={window}
-                    onClick={() => setLeaderboardWindow(window)}
-                    style={{
-                      flex: '1 1 110px',
-                      padding: '0.7rem',
-                      backgroundColor: leaderboardWindow === window ? '#f472b6' : '#0f1419',
-                      color: leaderboardWindow === window ? '#2c0a1b' : '#fff',
-                      border: '1px solid #2a2a2a',
-                      borderRadius: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {window}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                marginBottom: '0.75rem',
-                flexWrap: 'wrap',
-              }}>
-                {(['public', 'anonymous'] as SocialPrivacyMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setSocialPrivacyMode(mode)}
-                    style={{
-                      flex: '1 1 110px',
-                      padding: '0.7rem',
-                      backgroundColor: socialPrivacyMode === mode ? '#c084fc' : '#0f1419',
-                      color: socialPrivacyMode === mode ? '#210b35' : '#fff',
-                      border: '1px solid #2a2a2a',
-                      borderRadius: '0.75rem',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {mode}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setSocialComparisonEnabled((value) => !value)}
-                  style={{
-                    flex: '1 1 150px',
-                    padding: '0.7rem',
-                    backgroundColor: socialComparisonEnabled ? '#60a5fa' : '#374151',
-                    color: socialComparisonEnabled ? '#03141d' : '#fff',
-                    border: '1px solid #2a2a2a',
-                    borderRadius: '0.75rem',
-                    fontWeight: 'bold',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {socialComparisonEnabled ? 'Comparison On' : 'Comparison Off'}
+                <button className={styles.iconButton} onClick={copyAddress}>
+                  {copied ? 'Copied' : 'Copy address'}
                 </button>
               </div>
 
-              <div style={{
-                display: 'grid',
-                gap: '0.75rem',
-              }}>
-                {socialPreview.leaderboard.map((entry) => (
-                  <div
-                    key={`${socialPreview.window}-${entry.rank}`}
-                    style={{
-                      backgroundColor: '#0f1419',
-                      borderRadius: '0.75rem',
-                      padding: '1rem',
-                      border: '1px solid #2a2a2a',
-                      opacity: socialPreview.socialComparisonEnabled ? 1 : 0.7,
-                    }}
-                  >
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      marginBottom: '0.75rem',
-                      flexWrap: 'wrap',
-                    }}>
-                      <div>
-                        <div style={{ fontWeight: 'bold' }}>
-                          #{entry.rank} {entry.displayName}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#888' }}>{entry.handle}</div>
-                      </div>
-                      <div style={{
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        backgroundColor: 'rgba(244,114,182,0.16)',
-                        color: '#f9a8d4',
-                      }}>
-                        score {entry.score}
-                      </div>
-                    </div>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                      gap: '0.75rem',
-                      fontSize: '0.85rem',
-                    }}>
-                      <div>
-                        <div style={{ color: '#888' }}>Capital</div>
-                        <div style={{ fontWeight: 'bold' }}>{formatSocialUsd(entry.capitalUsd)}</div>
-                      </div>
-                      <div>
-                        <div style={{ color: '#888' }}>Repayment</div>
-                        <div style={{ fontWeight: 'bold' }}>{formatSocialPercent(entry.repaymentProgress)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <div style={{
-                  backgroundColor: '#0f1419',
-                  borderRadius: '0.75rem',
-                  padding: '1rem',
-                  border: '1px solid #2a2a2a',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    marginBottom: '0.75rem',
-                    flexWrap: 'wrap',
-                  }}>
-                    <div>
-                      <div style={{ fontWeight: 'bold' }}>Referral Preview</div>
-                      <div style={{ fontSize: '0.75rem', color: '#888' }}>
-                        Code {socialPreview.referral.code}
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: '0.25rem 0.6rem',
-                      borderRadius: '999px',
-                      fontSize: '0.75rem',
-                      fontWeight: 'bold',
-                      backgroundColor: 'rgba(74,222,128,0.16)',
-                      color: '#86efac',
-                    }}>
-                      {formatSocialUsd(socialPreview.referral.projectedRewardUsd)} projected
-                    </div>
-                  </div>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                    gap: '0.75rem',
-                    fontSize: '0.85rem',
-                    marginBottom: '0.9rem',
-                  }}>
-                    <div>
-                      <div style={{ color: '#888' }}>Clicks</div>
-                      <div style={{ fontWeight: 'bold' }}>{socialPreview.referral.clicks}</div>
-                    </div>
-                    <div>
-                      <div style={{ color: '#888' }}>Conversions</div>
-                      <div style={{ fontWeight: 'bold' }}>{socialPreview.referral.conversions}</div>
-                    </div>
-                    <div>
-                      <div style={{ color: '#888' }}>Conversion Rate</div>
-                      <div style={{ fontWeight: 'bold' }}>
-                        {formatSocialPercent(socialPreview.referral.conversionRate)}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{
-                    padding: '0.65rem 0.8rem',
-                    borderRadius: '0.75rem',
-                    backgroundColor: 'rgba(255,255,255,0.04)',
-                    color: '#d1d5db',
-                    fontSize: '0.85rem',
-                    lineHeight: 1.6,
-                  }}>
-                    Tip-ready assets: {socialPreview.referral.tipReadyAssets.join(', ')}. {socialPreview.note}
-                  </div>
+              <div className={styles.accountCard}>
+                <div>
+                  <span className={styles.accountLabel}>{walletMode === 'farcaster' ? 'Farcaster' : 'External'}</span>
+                  <strong className={styles.accountAddress}>{shortenAddress(address)}</strong>
+                  <p className={styles.accountSubtle}>
+                    {balanceLoading
+                      ? 'Refreshing balance...'
+                      : balanceError
+                        ? balanceError
+                        : balance
+                          ? `${balance} ETH available`
+                          : 'Balance not loaded yet'}
+                  </p>
+                </div>
+                <div className={styles.accountButtons}>
+                  <button className={styles.secondaryButton} onClick={loadBalance}>
+                    Refresh
+                  </button>
+                  {walletMode !== 'farcaster' && isFarcasterAvailable && (
+                    <button className={styles.ghostButton} onClick={switchToFarcaster}>
+                      Switch to Farcaster
+                    </button>
+                  )}
+                  {walletMode !== 'external' && (
+                    <button className={styles.ghostButton} onClick={switchToExternal}>
+                      Switch to external
+                    </button>
+                  )}
+                  <button className={styles.ghostButton} onClick={disconnect}>
+                    Disconnect
+                  </button>
                 </div>
               </div>
+            </section>
+
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <p className={styles.eyebrow}>Money movement</p>
+                  <h2 className={styles.panelTitle}>Transfer and receive</h2>
+                </div>
+              </div>
+
+              <div className={styles.toggleRow}>
+                {(['overview', 'send', 'receive'] as FinancePanel[]).map((panel) => (
+                  <button
+                    key={panel}
+                    className={panel === financePanel ? styles.segmentActive : styles.segment}
+                    onClick={() => setFinancePanel(panel)}
+                  >
+                    {panel === 'overview' ? 'Overview' : panel === 'send' ? 'Send' : 'Receive'}
+                  </button>
+                ))}
+              </div>
+
+              {financePanel === 'overview' && (
+                <div className={styles.gridTwo}>
+                  <div className={styles.infoTile}>
+                    <span className={styles.infoLabel}>Quick transfer</span>
+                    <strong>Send ETH on Sepolia</strong>
+                    <p>Move funds from the connected wallet while V3 logic stays in preview mode.</p>
+                    <button className={styles.primaryButton} onClick={() => setFinancePanel('send')}>
+                      Open send form
+                    </button>
+                  </div>
+                  <div className={styles.infoTile}>
+                    <span className={styles.infoLabel}>Receive funds</span>
+                    <strong>Share your wallet</strong>
+                    <p>Copy the connected wallet to receive testnet funds or manual team payouts.</p>
+                    <button className={styles.secondaryButton} onClick={() => setFinancePanel('receive')}>
+                      Show receive info
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {financePanel === 'send' && (
+                <div className={styles.formCard}>
+                  <label className={styles.field}>
+                    <span>Recipient</span>
+                    <input
+                      className={styles.input}
+                      value={recipient}
+                      onChange={(event) => setRecipient(event.target.value)}
+                      placeholder="0x..."
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Amount (ETH)</span>
+                    <input
+                      className={styles.input}
+                      value={amount}
+                      onChange={(event) => setAmount(event.target.value)}
+                      placeholder="0.10"
+                    />
+                  </label>
+                  <button
+                    className={styles.primaryButton}
+                    onClick={handleSend}
+                    disabled={!recipient || !amount || isPending || isConfirming}
+                  >
+                    {isPending ? 'Sending...' : isConfirming ? 'Confirming...' : 'Send ETH'}
+                  </button>
+                  {financeStatus && <div className={styles.notice}>{financeStatus}</div>}
+                </div>
+              )}
+
+              {financePanel === 'receive' && (
+                <div className={styles.callout}>
+                  <strong>{shortenAddress(address)}</strong>
+                  <span>Tap copy above to share the full address.</span>
+                </div>
+              )}
+            </section>
+
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <p className={styles.eyebrow}>Quick actions</p>
+                  <h2 className={styles.panelTitle}>Current product surfaces</h2>
+                </div>
+              </div>
+
+              <div className={styles.actionGrid}>
+                <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
+                  <span className={styles.actionEyebrow}>Preview</span>
+                  <strong>Deposit</strong>
+                  <span>Open the V3 builder for new-position deposits.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/v3?action=borrow">
+                  <span className={styles.actionEyebrow}>Preview</span>
+                  <strong>Borrow</strong>
+                  <span>Review borrow prep on the selected mock or contract-backed position.</span>
+                </Link>
+                <a className={styles.actionCard} href="/api/frames" target="_blank" rel="noopener noreferrer">
+                  <span className={styles.actionEyebrow}>Frames</span>
+                  <strong>Open frames</strong>
+                  <span>Inspect the live Frog routes for analytics, learning, and social flows.</span>
+                </a>
+                <a className={styles.actionCard} href="/api/tips" target="_blank" rel="noopener noreferrer">
+                  <span className={styles.actionEyebrow}>M3</span>
+                  <strong>Tip preview</strong>
+                  <span>Preview tip conversion without needing V3 contracts.</span>
+                </a>
+              </div>
+            </section>
+
+            <div className={styles.gridTwoWide}>
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.eyebrow}>Position watch</p>
+                    <h2 className={styles.panelTitle}>V3 preview status</h2>
+                  </div>
+                  <button className={styles.iconButton} onClick={reloadV3}>
+                    Reload
+                  </button>
+                </div>
+
+                {!isV3Enabled && (
+                  <div className={styles.callout}>
+                    Enable <code className={styles.inlineCode}>NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true</code>{' '}
+                    to turn on the tokenId-based preview flow.
+                  </div>
+                )}
+
+                {isV3Enabled && previewPosition && (
+                  <div className={styles.metricStack}>
+                    <div className={styles.metricStrip}>
+                      <span>Working position</span>
+                      <strong>#{previewPosition.tokenId}</strong>
+                    </div>
+                    <div className={styles.gridTwo}>
+                      <div className={styles.infoTile}>
+                        <span className={styles.infoLabel}>Collateral</span>
+                        <strong>{formatTokenAmount(previewPosition.collateral)} ETH</strong>
+                        <p>Debt: {formatTokenAmount(previewPosition.debt)} ETH</p>
+                      </div>
+                      <div className={styles.infoTile}>
+                        <span className={styles.infoLabel}>Available</span>
+                        <strong>{formatTokenAmount(previewPosition.availableCredit)} ETH</strong>
+                        <p>Health: {formatHealth(previewPosition.healthFactor)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {isV3Enabled && !previewPosition && !v3Loading && (
+                  <div className={styles.callout}>No preview positions detected for this wallet yet.</div>
+                )}
+
+                {v3Loading && <div className={styles.callout}>Loading position preview...</div>}
+                {v3Error && <div className={styles.callout}>{v3Error}</div>}
+              </section>
+
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.eyebrow}>Tip-to-invest</p>
+                    <h2 className={styles.panelTitle}>M3 conversion preview</h2>
+                  </div>
+                  <a
+                    className={styles.textLink}
+                    href={`/api/tips?asset=${tipAsset}&amount=${tipAmount}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Tips API
+                  </a>
+                </div>
+
+                <div className={styles.toggleRow}>
+                  {tipOptions.map((option) => (
+                    <button
+                      key={option.asset}
+                      className={option.asset === tipAsset ? styles.segmentActive : styles.segment}
+                      onClick={() => setTipAsset(option.asset)}
+                    >
+                      {option.asset}
+                    </button>
+                  ))}
+                </div>
+
+                <label className={styles.field}>
+                  <span>Tip amount</span>
+                  <input
+                    className={styles.input}
+                    value={tipAmount}
+                    onChange={(event) => setTipAmount(event.target.value)}
+                    placeholder="25"
+                  />
+                </label>
+
+                <div className={styles.gridTwo}>
+                  <div className={styles.infoTile}>
+                    <span className={styles.infoLabel}>Routed deposit</span>
+                    <strong>{formatTipUsd(tipPreview.estimatedDepositUsd)}</strong>
+                    <p>{tipPreview.routeLabel}</p>
+                  </div>
+                  <div className={styles.infoTile}>
+                    <span className={styles.infoLabel}>Monthly yield</span>
+                    <strong>{formatTipUsd(tipPreview.projectedMonthlyYieldUsd)}</strong>
+                    <p>{tipPreview.destinationVault}</p>
+                  </div>
+                </div>
+
+                <div className={styles.callout}>
+                  <strong>{tipPreview.actionLabel}</strong>
+                  <span>
+                    Fee drag {formatTipUsd(tipPreview.routingFeeUsd)}. {tipPreview.note}
+                  </span>
+                </div>
+              </section>
             </div>
 
-            {/* Quick Actions */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '0.75rem',
-            }}>
-              <Link
-                href="/miniapp/v3?action=deposit"
-                style={{
-                  padding: '1.25rem',
-                  backgroundColor: '#4ade80',
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: '1rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  textDecoration: 'none',
-                }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>💰</span>
-                Deposit
-              </Link>
-              <Link
-                href="/miniapp/v3?action=borrow"
-                style={{
-                  padding: '1.25rem',
-                  backgroundColor: '#60a5fa',
-                  color: '#000',
-                  border: 'none',
-                  borderRadius: '1rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  textDecoration: 'none',
-                }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>🏦</span>
-                Borrow
-              </Link>
-              <Link
-                href="/miniapp/v3?action=withdraw"
-                style={{
-                  padding: '1.25rem',
-                  backgroundColor: '#38bdf8',
-                  color: '#03141d',
-                  border: 'none',
-                  borderRadius: '1rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  textDecoration: 'none',
-                }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>↘️</span>
-                Withdraw
-              </Link>
-              <Link
-                href="/miniapp/v3?action=repay"
-                style={{
-                  padding: '1.25rem',
-                  backgroundColor: '#fbbf24',
-                  color: '#1a1201',
-                  border: 'none',
-                  borderRadius: '1rem',
-                  fontWeight: 'bold',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  textDecoration: 'none',
-                }}
-              >
-                <span style={{ fontSize: '1.5rem' }}>♻️</span>
-                Repay
-              </Link>
+            <div className={styles.gridTwoWide}>
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.eyebrow}>Market pulse</p>
+                    <h2 className={styles.panelTitle}>Current snapshot</h2>
+                  </div>
+                  <a className={styles.textLink} href="/api/market" target="_blank" rel="noopener noreferrer">
+                    Market API
+                  </a>
+                </div>
+
+                <div className={styles.stackCompact}>
+                  {getMarketSnapshots().map((snapshot) => (
+                    <div key={snapshot.symbol} className={styles.listCard}>
+                      <div className={styles.listTop}>
+                        <strong>{snapshot.label}</strong>
+                        <span className={styles.inlineChip}>{snapshot.trend}</span>
+                      </div>
+                      <div className={styles.listMetrics}>
+                        <span>APY {formatMarketPercent(snapshot.currentApy)}</span>
+                        <span>7d {formatMarketDelta(snapshot.apyDelta7d)}</span>
+                        <span>TVL {formatMarketUsd(snapshot.tvlUsd)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.eyebrow}>Learning path</p>
+                    <h2 className={styles.panelTitle}>Protocol education</h2>
+                  </div>
+                  <a
+                    className={styles.textLink}
+                    href={`/api/education?step=${activeLesson.step}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Lesson API
+                  </a>
+                </div>
+
+                <div className={styles.lessonCard}>
+                  <span className={styles.infoLabel}>
+                    Lesson {activeLesson.step} of {activeLesson.totalSteps}
+                  </span>
+                  <strong>{activeLesson.title}</strong>
+                  <p>{activeLesson.summary}</p>
+                  <ul className={styles.bulletList}>
+                    {activeLesson.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
+                    ))}
+                  </ul>
+                  <div className={styles.dualActionRow}>
+                    <button
+                      className={styles.secondaryButton}
+                      onClick={() => setLessonStep(getPreviousEducationStep(activeLesson.step))}
+                      disabled={activeLesson.step === 1}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      className={styles.primaryButton}
+                      onClick={() =>
+                        setLessonStep(
+                          activeLesson.step === activeLesson.totalSteps
+                            ? 1
+                            : getNextEducationStep(activeLesson.step),
+                        )
+                      }
+                    >
+                      {activeLesson.step === activeLesson.totalSteps ? 'Restart' : 'Next'}
+                    </button>
+                  </div>
+                </div>
+              </section>
             </div>
-          </>
+
+            <div className={styles.gridTwoWide}>
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.eyebrow}>Social layer</p>
+                    <h2 className={styles.panelTitle}>Leaderboard and referrals</h2>
+                  </div>
+                  <a
+                    className={styles.textLink}
+                    href={`/api/social?window=${leaderboardWindow}&privacy=${socialPrivacyMode}&compare=${
+                      socialComparisonEnabled ? 'on' : 'off'
+                    }`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Social API
+                  </a>
+                </div>
+
+                <div className={styles.toggleRow}>
+                  {(['weekly', 'monthly'] as LeaderboardWindow[]).map((window) => (
+                    <button
+                      key={window}
+                      className={window === leaderboardWindow ? styles.segmentActive : styles.segment}
+                      onClick={() => setLeaderboardWindow(window)}
+                    >
+                      {window}
+                    </button>
+                  ))}
+                  <button
+                    className={socialComparisonEnabled ? styles.segmentActive : styles.segment}
+                    onClick={() => setSocialComparisonEnabled((value) => !value)}
+                  >
+                    {socialComparisonEnabled ? 'Compare on' : 'Compare off'}
+                  </button>
+                </div>
+
+                <div className={styles.toggleRow}>
+                  {(['public', 'anonymous'] as SocialPrivacyMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      className={mode === socialPrivacyMode ? styles.segmentActive : styles.segment}
+                      onClick={() => setSocialPrivacyMode(mode)}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.stackCompact}>
+                  {socialPreview.leaderboard.map((entry) => (
+                    <div key={`${entry.rank}-${entry.displayName}`} className={styles.listCard}>
+                      <div className={styles.listTop}>
+                        <strong>
+                          #{entry.rank} {entry.displayName}
+                        </strong>
+                        <span className={styles.inlineChip}>score {entry.score}</span>
+                      </div>
+                      <div className={styles.listMetrics}>
+                        <span>{entry.handle}</span>
+                        <span>{formatSocialUsd(entry.capitalUsd)}</span>
+                        <span>{formatSocialPercent(entry.repaymentProgress)} repaid</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className={styles.callout}>
+                  <strong>
+                    Referral {socialPreview.referral.code} | {socialPreview.referral.conversions}/
+                    {socialPreview.referral.clicks}
+                  </strong>
+                  <span>
+                    {formatSocialPercent(socialPreview.referral.conversionRate)} conversion rate,{' '}
+                    {formatSocialUsd(socialPreview.referral.projectedRewardUsd)} projected rewards.{' '}
+                    {socialPreview.note}
+                  </span>
+                </div>
+              </section>
+
+              <section className={styles.panel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.eyebrow}>Automation</p>
+                    <h2 className={styles.panelTitle}>Bot and alert queue</h2>
+                  </div>
+                  <a
+                    className={styles.textLink}
+                    href={`/api/bot?kind=${briefingKind}${
+                      briefingKind === 'health' ? `&health=${previewHealthState}` : ''
+                    }${briefingKind === 'milestone' ? `&progress=${milestoneProgress}` : ''}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Bot API
+                  </a>
+                </div>
+
+                <div className={styles.toggleRow}>
+                  {(['daily', 'health', 'milestone'] as BotBriefingKind[]).map((kind) => (
+                    <button
+                      key={kind}
+                      className={kind === briefingKind ? styles.segmentActive : styles.segment}
+                      onClick={() => setBriefingKind(kind)}
+                    >
+                      {kind}
+                    </button>
+                  ))}
+                </div>
+
+                {briefingKind === 'milestone' && (
+                  <div className={styles.toggleRow}>
+                    {[25, 50, 75, 100].map((value) => (
+                      <button
+                        key={value}
+                        className={value === milestoneProgress ? styles.segmentActive : styles.segment}
+                        onClick={() => setMilestoneProgress(value)}
+                      >
+                        {value}%
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className={styles.lessonCard}>
+                  <span className={styles.infoLabel}>{activeBriefing.kind} scenario</span>
+                  <strong>{activeBriefing.headline}</strong>
+                  <p>{activeBriefing.summary}</p>
+                  <ul className={styles.bulletList}>
+                    {activeBriefing.lines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  <div className={styles.calloutInline}>Suggested CTA: {activeBriefing.cta}</div>
+                </div>
+              </section>
+            </div>
+          </section>
         )}
-
-        {/* Info Card */}
-        <div style={{
-          backgroundColor: '#1a1a1a',
-          borderRadius: '1rem',
-          padding: '1rem',
-          border: '2px solid #2a2a2a',
-          fontSize: '0.85rem',
-          color: '#888',
-        }}>
-          <div style={{ marginBottom: '0.5rem', fontWeight: 'bold', color: '#fff' }}>
-            💡 How it works
-          </div>
-          <ul style={{ margin: 0, paddingLeft: '1.5rem', lineHeight: 1.6 }}>
-            <li>Connect a Farcaster or external wallet</li>
-            <li>V3 positions are tokenId-based and can be multiple per wallet</li>
-            <li>Preview positions now, then wire deposit and borrow flows on top</li>
-            <li>Final contract addresses stay behind config until launch</li>
-          </ul>
-        </div>
-
-        {/* Footer */}
-        <div style={{
-          textAlign: 'center',
-          padding: '1rem',
-          fontSize: '0.8rem',
-          color: '#666',
-        }}>
-          <div style={{
-            padding: '0.75rem',
-            backgroundColor: '#1a1a1a',
-            borderRadius: '0.5rem',
-            marginBottom: '0.5rem',
-          }}>
-            <div style={{ color: '#fbbf24', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-              🧪 Running on Sepolia Testnet
-            </div>
-            <div style={{ fontSize: '0.75rem' }}>
-              Get free testnet ETH from <a href="https://sepoliafaucet.com" target="_blank" rel="noopener noreferrer" style={{ color: '#4ade80' }}>Sepolia Faucet</a>
-            </div>
-          </div>
-          <div>Powered by CastAlchemy Preview</div>
-          <div style={{ marginTop: '0.25rem' }}>V3 Integration: In Progress</div>
-        </div>
       </div>
     </main>
   );

@@ -14,6 +14,7 @@ const testEntries = [
   'tests/v3.http.test.ts',
   'tests/market.snapshots.test.ts',
   'tests/social.preview.test.ts',
+  'tests/social.tips.test.ts',
 ];
 const outputFiles = testEntries.map((entry) => {
   const filename = entry.split('/').pop()?.replace(/\.ts$/, '.js');
