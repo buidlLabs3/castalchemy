@@ -8,10 +8,12 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 const outDir = resolve(repoRoot, '.test-dist');
 const testEntries = [
+  'tests/automation.briefings.test.ts',
   'tests/education.lessons.test.ts',
   'tests/v3.server.test.ts',
   'tests/v3.http.test.ts',
   'tests/market.snapshots.test.ts',
+  'tests/social.preview.test.ts',
 ];
 const outputFiles = testEntries.map((entry) => {
   const filename = entry.split('/').pop()?.replace(/\.ts$/, '.js');

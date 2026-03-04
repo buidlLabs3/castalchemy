@@ -24,6 +24,14 @@ import {
   getNextEducationStep,
   getPreviousEducationStep,
 } from '@/lib/education/lessons';
+import { getBotBriefing, type BotBriefingKind } from '@/lib/automation/briefings';
+import {
+  formatSocialPercent,
+  formatSocialUsd,
+  getSocialPreview,
+  type LeaderboardWindow,
+  type SocialPrivacyMode,
+} from '@/lib/social/preview';
 
 function formatV3Amount(value: bigint): string {
   return Number.parseFloat(formatEther(value)).toFixed(4);
@@ -44,6 +52,11 @@ export default function MiniApp() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
   const [lessonStep, setLessonStep] = useState(1);
+  const [briefingKind, setBriefingKind] = useState<BotBriefingKind>('daily');
+  const [milestoneProgress, setMilestoneProgress] = useState(50);
+  const [leaderboardWindow, setLeaderboardWindow] = useState<LeaderboardWindow>('weekly');
+  const [socialPrivacyMode, setSocialPrivacyMode] = useState<SocialPrivacyMode>('public');
+  const [socialComparisonEnabled, setSocialComparisonEnabled] = useState(true);
   
   const {
     address,
@@ -68,6 +81,16 @@ export default function MiniApp() {
   const previewPositions = v3Positions.slice(0, 2);
   const marketSnapshots = getMarketSnapshots();
   const activeLesson = getEducationLesson(lessonStep);
+  const previewHealthState = previewPositions[0]?.healthState ?? 'safe';
+  const activeBriefing = getBotBriefing(briefingKind, {
+    healthState: previewHealthState,
+    progress: milestoneProgress,
+  });
+  const socialPreview = getSocialPreview({
+    window: leaderboardWindow,
+    privacyMode: socialPrivacyMode,
+    socialComparisonEnabled,
+  });
 
   // Fast SDK initialization - non-blocking
   useEffect(() => {
@@ -899,6 +922,144 @@ export default function MiniApp() {
               )}
             </div>
 
+            {/* Automation Preview */}
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '1rem',
+              padding: '1rem',
+              border: '2px solid #2a2a2a',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.75rem',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                <h2 style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}>
+                  <span>🤖</span> Bot Preview
+                </h2>
+                <a
+                  href={`/api/bot?kind=${briefingKind}${briefingKind === 'health' ? `&health=${previewHealthState}` : ''}${
+                    briefingKind === 'milestone' ? `&progress=${milestoneProgress}` : ''
+                  }`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '0.6rem 0.9rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Bot API
+                </a>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                {(['daily', 'health', 'milestone'] as BotBriefingKind[]).map((kind) => (
+                  <button
+                    key={kind}
+                    onClick={() => setBriefingKind(kind)}
+                    style={{
+                      flex: '1 1 100px',
+                      padding: '0.7rem',
+                      backgroundColor: briefingKind === kind ? '#60a5fa' : '#0f1419',
+                      color: briefingKind === kind ? '#03141d' : '#fff',
+                      border: '1px solid #2a2a2a',
+                      borderRadius: '0.75rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {kind}
+                  </button>
+                ))}
+              </div>
+
+              {briefingKind === 'milestone' && (
+                <div style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  marginBottom: '0.75rem',
+                  flexWrap: 'wrap',
+                }}>
+                  {[25, 50, 75, 100].map((value) => (
+                    <button
+                      key={value}
+                      onClick={() => setMilestoneProgress(value)}
+                      style={{
+                        flex: '1 1 80px',
+                        padding: '0.6rem',
+                        backgroundColor: milestoneProgress === value ? '#fbbf24' : '#0f1419',
+                        color: milestoneProgress === value ? '#1a1201' : '#fff',
+                        border: '1px solid #2a2a2a',
+                        borderRadius: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {value}%
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div style={{
+                backgroundColor: '#0f1419',
+                borderRadius: '0.75rem',
+                padding: '1rem',
+                border: '1px solid #2a2a2a',
+              }}>
+                <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: '0.25rem' }}>
+                  {activeBriefing.kind} scenario
+                </div>
+                <div style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '0.5rem' }}>
+                  {activeBriefing.headline}
+                </div>
+                <div style={{ color: '#d1d5db', lineHeight: 1.6, marginBottom: '0.75rem', fontSize: '0.9rem' }}>
+                  {activeBriefing.summary}
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gap: '0.5rem',
+                  fontSize: '0.85rem',
+                  color: '#9ca3af',
+                  marginBottom: '0.9rem',
+                }}>
+                  {activeBriefing.lines.map((line) => (
+                    <div key={line}>• {line}</div>
+                  ))}
+                </div>
+                <div style={{
+                  padding: '0.65rem 0.8rem',
+                  borderRadius: '0.75rem',
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  color: '#d1d5db',
+                  fontSize: '0.85rem',
+                }}>
+                  Suggested CTA: <strong>{activeBriefing.cta}</strong>
+                </div>
+              </div>
+            </div>
+
             {/* Learning Path */}
             <div style={{
               backgroundColor: '#1a1a1a',
@@ -1150,6 +1311,245 @@ export default function MiniApp() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Social Preview */}
+            <div style={{
+              backgroundColor: '#1a1a1a',
+              borderRadius: '1rem',
+              padding: '1rem',
+              border: '2px solid #2a2a2a',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '0.75rem',
+                gap: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                <h2 style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 'bold',
+                  margin: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}>
+                  <span>🏆</span> Social Preview
+                </h2>
+                <a
+                  href={`/api/social?window=${leaderboardWindow}&privacy=${socialPrivacyMode}&compare=${
+                    socialComparisonEnabled ? 'on' : 'off'
+                  }`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    padding: '0.6rem 0.9rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    fontSize: '0.85rem',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  Social API
+                </a>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                {(['weekly', 'monthly'] as LeaderboardWindow[]).map((window) => (
+                  <button
+                    key={window}
+                    onClick={() => setLeaderboardWindow(window)}
+                    style={{
+                      flex: '1 1 110px',
+                      padding: '0.7rem',
+                      backgroundColor: leaderboardWindow === window ? '#f472b6' : '#0f1419',
+                      color: leaderboardWindow === window ? '#2c0a1b' : '#fff',
+                      border: '1px solid #2a2a2a',
+                      borderRadius: '0.75rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {window}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                marginBottom: '0.75rem',
+                flexWrap: 'wrap',
+              }}>
+                {(['public', 'anonymous'] as SocialPrivacyMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setSocialPrivacyMode(mode)}
+                    style={{
+                      flex: '1 1 110px',
+                      padding: '0.7rem',
+                      backgroundColor: socialPrivacyMode === mode ? '#c084fc' : '#0f1419',
+                      color: socialPrivacyMode === mode ? '#210b35' : '#fff',
+                      border: '1px solid #2a2a2a',
+                      borderRadius: '0.75rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {mode}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setSocialComparisonEnabled((value) => !value)}
+                  style={{
+                    flex: '1 1 150px',
+                    padding: '0.7rem',
+                    backgroundColor: socialComparisonEnabled ? '#60a5fa' : '#374151',
+                    color: socialComparisonEnabled ? '#03141d' : '#fff',
+                    border: '1px solid #2a2a2a',
+                    borderRadius: '0.75rem',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {socialComparisonEnabled ? 'Comparison On' : 'Comparison Off'}
+                </button>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gap: '0.75rem',
+              }}>
+                {socialPreview.leaderboard.map((entry) => (
+                  <div
+                    key={`${socialPreview.window}-${entry.rank}`}
+                    style={{
+                      backgroundColor: '#0f1419',
+                      borderRadius: '0.75rem',
+                      padding: '1rem',
+                      border: '1px solid #2a2a2a',
+                      opacity: socialPreview.socialComparisonEnabled ? 1 : 0.7,
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      marginBottom: '0.75rem',
+                      flexWrap: 'wrap',
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 'bold' }}>
+                          #{entry.rank} {entry.displayName}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#888' }}>{entry.handle}</div>
+                      </div>
+                      <div style={{
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '999px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        backgroundColor: 'rgba(244,114,182,0.16)',
+                        color: '#f9a8d4',
+                      }}>
+                        score {entry.score}
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                      gap: '0.75rem',
+                      fontSize: '0.85rem',
+                    }}>
+                      <div>
+                        <div style={{ color: '#888' }}>Capital</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatSocialUsd(entry.capitalUsd)}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#888' }}>Repayment</div>
+                        <div style={{ fontWeight: 'bold' }}>{formatSocialPercent(entry.repaymentProgress)}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{
+                  backgroundColor: '#0f1419',
+                  borderRadius: '0.75rem',
+                  padding: '1rem',
+                  border: '1px solid #2a2a2a',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                    marginBottom: '0.75rem',
+                    flexWrap: 'wrap',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 'bold' }}>Referral Preview</div>
+                      <div style={{ fontSize: '0.75rem', color: '#888' }}>
+                        Code {socialPreview.referral.code}
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: '0.25rem 0.6rem',
+                      borderRadius: '999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold',
+                      backgroundColor: 'rgba(74,222,128,0.16)',
+                      color: '#86efac',
+                    }}>
+                      {formatSocialUsd(socialPreview.referral.projectedRewardUsd)} projected
+                    </div>
+                  </div>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                    gap: '0.75rem',
+                    fontSize: '0.85rem',
+                    marginBottom: '0.9rem',
+                  }}>
+                    <div>
+                      <div style={{ color: '#888' }}>Clicks</div>
+                      <div style={{ fontWeight: 'bold' }}>{socialPreview.referral.clicks}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#888' }}>Conversions</div>
+                      <div style={{ fontWeight: 'bold' }}>{socialPreview.referral.conversions}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#888' }}>Conversion Rate</div>
+                      <div style={{ fontWeight: 'bold' }}>
+                        {formatSocialPercent(socialPreview.referral.conversionRate)}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '0.65rem 0.8rem',
+                    borderRadius: '0.75rem',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    color: '#d1d5db',
+                    fontSize: '0.85rem',
+                    lineHeight: 1.6,
+                  }}>
+                    Tip-ready assets: {socialPreview.referral.tipReadyAssets.join(', ')}. {socialPreview.note}
+                  </div>
+                </div>
               </div>
             </div>
 

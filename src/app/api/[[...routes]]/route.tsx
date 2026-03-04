@@ -7,6 +7,7 @@
 import { Button, Frog, TextInput, type FrameContext, type TransactionContext } from 'frog';
 import { handle } from 'frog/next';
 import { formatEther, isAddress, type Address } from 'viem';
+import { getBotBriefing } from '@/lib/automation/briefings';
 import {
   getEducationLesson,
   getNextEducationStep,
@@ -18,6 +19,11 @@ import {
   formatMarketUsd,
   getMarketSnapshot,
 } from '@/lib/market/snapshots';
+import {
+  formatSocialPercent,
+  formatSocialUsd,
+  getSocialPreview,
+} from '@/lib/social/preview';
 import {
   assertV3Borrowable,
   assertV3DebtAmount,
@@ -107,6 +113,20 @@ function getTrendAccent(symbol: 'alUSD' | 'alETH') {
   return symbol === 'alUSD' ? '#4ade80' : '#60a5fa';
 }
 
+function getBriefingAccent(severity: 'info' | 'watch' | 'critical' | 'success') {
+  switch (severity) {
+    case 'watch':
+      return '#fbbf24';
+    case 'critical':
+      return '#f87171';
+    case 'success':
+      return '#4ade80';
+    case 'info':
+    default:
+      return '#60a5fa';
+  }
+}
+
 function getLessonActionTarget(label: string) {
   switch (label) {
     case 'Open Positions':
@@ -116,6 +136,20 @@ function getLessonActionTarget(label: string) {
     case 'Review Deposit':
     default:
       return '/frames/deposit';
+  }
+}
+
+function getBriefingActionTarget(label: string) {
+  switch (label) {
+    case 'Open Learning Path':
+      return '/frames/learn';
+    case 'Open Positions':
+      return '/frames/dashboard';
+    case 'Review Borrow':
+      return '/frames/dashboard';
+    case 'Open Analytics':
+    default:
+      return '/frames/analytics';
   }
 }
 
@@ -441,15 +475,100 @@ app.frame('/frames/analytics', (c) => {
       <Button key="switch" action={`/frames/analytics?market=${nextSymbol}`}>
         View {nextSymbol}
       </Button>,
-      <Button key="deposit" action="/frames/deposit">
-        Deposit
+      <Button key="alerts" action="/frames/alerts">
+        Alerts
+      </Button>,
+      <Button key="social" action="/frames/social">
+        Social
       </Button>,
       <Button key="positions" action="/frames/dashboard">
         Positions
       </Button>,
-      <Button.Redirect key="miniapp" location="/miniapp">
-        Mini App
-      </Button.Redirect>,
+    ],
+  });
+});
+
+app.frame('/frames/social', (c) => {
+  const social = getSocialPreview({
+    window: getSearchParam(c, 'window'),
+    privacyMode: getSearchParam(c, 'privacy'),
+    socialComparisonEnabled: getSearchParam(c, 'compare') === 'off' ? false : true,
+  });
+  const topEntry = social.leaderboard[0];
+  const nextWindow = social.window === 'weekly' ? 'monthly' : 'weekly';
+  const nextPrivacy = social.privacyMode === 'public' ? 'anonymous' : 'public';
+  const nextComparison = social.socialComparisonEnabled ? 'off' : 'on';
+  const windowLabel = social.window === 'weekly' ? 'Weekly' : 'Monthly';
+  const privacyLabel = social.privacyMode === 'public' ? 'Public' : 'Anonymous';
+  const compareLabel = social.socialComparisonEnabled ? 'Visible' : 'Hidden';
+
+  return c.res({
+    image: renderCard('Social Preview', [
+      `${windowLabel} leaderboard | ${privacyLabel} mode`,
+      `#1 ${topEntry.displayName} | ${formatSocialUsd(topEntry.capitalUsd)} | Score ${topEntry.score}`,
+      `Referrals: ${social.referral.conversions}/${social.referral.clicks} (${formatSocialPercent(social.referral.conversionRate)})`,
+      `Tips: ${social.referral.tipReadyAssets.join(', ')} | Compare: ${compareLabel}`,
+      social.note,
+    ], '#f472b6'),
+    intents: [
+      <Button
+        key="window"
+        action={`/frames/social?window=${nextWindow}&privacy=${social.privacyMode}&compare=${
+          social.socialComparisonEnabled ? 'on' : 'off'
+        }`}
+      >
+        {nextWindow === 'weekly' ? 'Weekly' : 'Monthly'}
+      </Button>,
+      <Button
+        key="privacy"
+        action={`/frames/social?window=${social.window}&privacy=${nextPrivacy}&compare=${
+          social.socialComparisonEnabled ? 'on' : 'off'
+        }`}
+      >
+        {nextPrivacy === 'public' ? 'Public' : 'Anon'}
+      </Button>,
+      <Button
+        key="compare"
+        action={`/frames/social?window=${social.window}&privacy=${social.privacyMode}&compare=${nextComparison}`}
+      >
+        {social.socialComparisonEnabled ? 'Hide Compare' : 'Show Compare'}
+      </Button>,
+      <Button key="positions" action="/frames/dashboard">
+        Positions
+      </Button>,
+    ],
+  });
+});
+
+app.frame('/frames/alerts', (c) => {
+  const kind = getSearchParam(c, 'kind');
+  const healthParam = getSearchParam(c, 'health');
+  const progressParam = Number(getSearchParam(c, 'progress') ?? '50');
+  const briefing = getBotBriefing(kind, {
+    healthState: healthParam === 'watch' || healthParam === 'danger' ? healthParam : 'watch',
+    progress: Number.isFinite(progressParam) ? progressParam : 50,
+  });
+
+  return c.res({
+    image: renderCard(briefing.headline, [
+      briefing.summary,
+      briefing.lines[0],
+      briefing.lines[1],
+      briefing.lines[2],
+    ], getBriefingAccent(briefing.severity)),
+    intents: [
+      <Button key="daily" action="/frames/alerts?kind=daily">
+        Daily
+      </Button>,
+      <Button key="health" action="/frames/alerts?kind=health&health=watch">
+        Health
+      </Button>,
+      <Button key="milestone" action="/frames/alerts?kind=milestone&progress=75">
+        Milestone
+      </Button>,
+      <Button key="action" action={getBriefingActionTarget(briefing.cta)}>
+        {briefing.cta}
+      </Button>,
     ],
   });
 });
