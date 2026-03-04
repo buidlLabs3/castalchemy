@@ -876,8 +876,8 @@ export default function MiniApp() {
               gridTemplateColumns: '1fr 1fr',
               gap: '0.75rem',
             }}>
-              <button
-                onClick={() => alert('Use the V3 Positions card to preview the new deposit flow.')}
+              <Link
+                href="/miniapp/v3?action=deposit"
                 style={{
                   padding: '1.25rem',
                   backgroundColor: '#4ade80',
@@ -891,13 +891,14 @@ export default function MiniApp() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '0.5rem',
+                  textDecoration: 'none',
                 }}
               >
                 <span style={{ fontSize: '1.5rem' }}>💰</span>
                 Deposit
-              </button>
-              <button
-                onClick={() => alert('Borrow flow will be added on top of the V3 position model next.')}
+              </Link>
+              <Link
+                href="/miniapp/v3?action=borrow"
                 style={{
                   padding: '1.25rem',
                   backgroundColor: '#60a5fa',
@@ -911,11 +912,54 @@ export default function MiniApp() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   gap: '0.5rem',
+                  textDecoration: 'none',
                 }}
               >
                 <span style={{ fontSize: '1.5rem' }}>🏦</span>
                 Borrow
-              </button>
+              </Link>
+              <Link
+                href="/miniapp/v3?action=withdraw"
+                style={{
+                  padding: '1.25rem',
+                  backgroundColor: '#38bdf8',
+                  color: '#03141d',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>↘️</span>
+                Withdraw
+              </Link>
+              <Link
+                href="/miniapp/v3?action=repay"
+                style={{
+                  padding: '1.25rem',
+                  backgroundColor: '#fbbf24',
+                  color: '#1a1201',
+                  border: 'none',
+                  borderRadius: '1rem',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  textDecoration: 'none',
+                }}
+              >
+                <span style={{ fontSize: '1.5rem' }}>♻️</span>
+                Repay
+              </Link>
             </div>
           </>
         )}
