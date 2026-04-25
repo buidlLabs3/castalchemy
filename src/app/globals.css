@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 * {
   box-sizing: border-box;
   padding: 0;
@@ -5,18 +7,23 @@
 }
 
 :root {
-  --app-bg: #081019;
-  --app-glow: rgba(104, 233, 163, 0.22);
-  --surface: rgba(14, 28, 39, 0.64);
-  --surface-quiet: rgba(12, 24, 34, 0.78);
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(190, 255, 222, 0.24);
-  --ink: #f1fbf7;
-  --muted: rgba(223, 244, 236, 0.68);
-  --brand: #2cd39a;
-  --brand-strong: #b6ffd9;
+  --app-bg: #0b0e13;
+  --app-glow: rgba(45, 211, 154, 0.06);
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-quiet: rgba(255, 255, 255, 0.02);
+  --surface-raised: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --ink: #e8edf2;
+  --ink-strong: #f4f7fa;
+  --muted: rgba(255, 255, 255, 0.45);
+  --brand: #2dd49b;
+  --brand-muted: rgba(45, 212, 155, 0.15);
+  --brand-strong: #5eeab8;
   --accent: #d7f462;
-  --font-display: 'Avenir Next', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 html,
@@ -26,15 +33,13 @@ body {
 }
 
 body {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
+  font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background:
-    radial-gradient(circle at top left, var(--app-glow), transparent 32%),
-    radial-gradient(circle at 85% 20%, rgba(87, 167, 255, 0.18), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(16, 110, 196, 0.16), transparent 30%),
-    var(--app-bg);
+  background: var(--app-bg);
   color: var(--ink);
+  line-height: 1.5;
 }
 
 a {

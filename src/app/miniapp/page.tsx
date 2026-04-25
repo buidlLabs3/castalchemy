@@ -608,20 +608,30 @@ export default function MiniApp() {
               </div>
 
               <div className={styles.actionGrid}>
-                <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
-                  <span className={styles.actionEyebrow}>Preview</span>
+                <Link className={styles.actionCard} href="/miniapp/deposit">
+                  <span className={styles.actionEyebrow}>V2</span>
                   <strong>Deposit</strong>
-                  <span>Open the V3 builder for new-position deposits.</span>
+                  <span>Deposit collateral into an alUSD or alETH vault.</span>
                 </Link>
-                <Link className={styles.actionCard} href="/miniapp/v3?action=borrow">
-                  <span className={styles.actionEyebrow}>Preview</span>
-                  <strong>Borrow</strong>
-                  <span>Review borrow prep on the selected mock or contract-backed position.</span>
+                <Link className={styles.actionCard} href="/miniapp/positions">
+                  <span className={styles.actionEyebrow}>V2</span>
+                  <strong>My Positions</strong>
+                  <span>View your V2 vault positions, health factors, and balances.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
+                  <span className={styles.actionEyebrow}>V3 preview</span>
+                  <strong>V3 Builder</strong>
+                  <span>Open the V3 transaction builder for tokenId-based positions.</span>
                 </Link>
                 <a className={styles.actionCard} href="/api/frames" target="_blank" rel="noopener noreferrer">
                   <span className={styles.actionEyebrow}>Frames</span>
                   <strong>Open frames</strong>
-                  <span>Inspect the live Frog routes for analytics, learning, and social flows.</span>
+                  <span>Inspect live Frog routes for analytics, learning, and social flows.</span>
+                </a>
+                <a className={styles.actionCard} href="/api/cast-action" target="_blank" rel="noopener noreferrer">
+                  <span className={styles.actionEyebrow}>M2</span>
+                  <strong>⚗️ Cast Action</strong>
+                  <span>Install the Alchemix This cast action for Farcaster.</span>
                 </a>
                 <a className={styles.actionCard} href="/api/tips" target="_blank" rel="noopener noreferrer">
                   <span className={styles.actionEyebrow}>M3</span>

@@ -1,40 +1,38 @@
+/* ── Layout ─────────────────────────────────────────── */
+
 .page {
   min-height: 100vh;
-  padding: clamp(18px, 2vw, 28px) clamp(16px, 2.8vw, 40px) 56px;
+  padding: 20px 28px 64px;
 }
 
 .shell {
   width: 100%;
-  max-width: none;
-  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
 
+/* ── Hero ───────────────────────────────────────────── */
+
 .hero {
-  padding: clamp(22px, 2.4vw, 34px);
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 86% 8%, rgba(197, 247, 130, 0.2), transparent 34%),
-    radial-gradient(circle at 10% 94%, rgba(101, 170, 255, 0.16), transparent 36%),
-    linear-gradient(140deg, #06131d, #0a3f52 54%, #0b5f66);
-  color: #f6fff8;
-  box-shadow: 0 24px 46px rgba(4, 18, 29, 0.5);
+  padding: 24px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(45, 212, 155, 0.06) 0%, rgba(45, 212, 155, 0) 50%), var(--surface-raised);
+  border: 1px solid var(--border);
 }
 
 .heroRow {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
   align-items: flex-start;
 }
 
 .badgeRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .brandBadge,
@@ -42,89 +40,98 @@
 .inlineChip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .brandBadge {
-  background: rgba(255, 255, 255, 0.09);
-  color: #ffffff;
+  background: var(--brand-muted);
+  color: var(--brand-strong);
 }
 
 .networkBadge {
-  background: rgba(159, 255, 206, 0.22);
-  color: #c5ffe5;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
 }
 
 .heroTitle {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3.2rem);
-  line-height: 1;
-  letter-spacing: -0.03em;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--ink-strong);
 }
 
 .heroSubtitle {
-  margin: 12px 0 0;
-  max-width: 640px;
-  color: rgba(246, 255, 248, 0.86);
-  line-height: 1.6;
-  font-size: 0.97rem;
+  margin: 8px 0 0;
+  max-width: 520px;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 13px;
 }
 
 .heroWallet {
-  min-width: 240px;
-  padding: 16px;
-  border-radius: 22px;
-  background: rgba(3, 15, 26, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+  min-width: 200px;
+  padding: 14px 16px;
+  border-radius: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  font-size: 13px;
 }
+
+/* ── Labels ─────────────────────────────────────────── */
 
 .walletLabel,
 .metricLabel,
 .eyebrow,
 .infoLabel {
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .walletHint,
 .metricFoot {
-  color: rgba(246, 255, 248, 0.76);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  color: var(--muted);
+  font-size: 12px;
 }
 
+/* ── Metrics row ────────────────────────────────────── */
+
 .metrics {
-  margin-top: 18px;
+  margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
 .metricCard {
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(3, 13, 22, 0.38);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(8px);
+  padding: 14px 16px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .metricCard strong {
-  font-size: 1.1rem;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink-strong);
 }
+
+/* ── Stack / Panel ──────────────────────────────────── */
 
 .stack,
 .stackCompact {
@@ -133,41 +140,39 @@
 }
 
 .stack {
-  gap: 18px;
+  gap: 24px;
 }
 
 .stackCompact {
-  gap: 10px;
+  gap: 8px;
 }
 
 .panel {
   background: transparent;
   border: 0;
-  border-radius: 0;
-  padding: 4px 0 0;
-  box-shadow: none;
+  padding: 0;
 }
 
 .panelHeader {
   display: flex;
   justify-content: space-between;
-  gap: 14px;
-  align-items: flex-start;
-  margin-bottom: 18px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
 }
 
 .eyebrow {
-  margin: 0 0 6px;
-  color: var(--muted);
+  margin: 0 0 2px;
 }
 
 .panelTitle {
   margin: 0;
-  color: var(--ink);
-  font-size: clamp(1.1rem, 2.8vw, 1.45rem);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-strong);
 }
+
+/* ── Buttons / Controls ─────────────────────────────── */
 
 .walletActions,
 .accountButtons,
@@ -175,7 +180,8 @@
 .dualActionRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
 }
 
 .walletConnect {
@@ -183,26 +189,31 @@
   align-items: center;
 }
 
+/* ── Grids ──────────────────────────────────────────── */
+
 .gridTwo,
 .gridTwoWide,
 .actionGrid,
 .listMetrics {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .gridTwo {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(2, 1fr);
 }
 
 .gridTwoWide {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
 }
 
 .actionGrid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
 }
+
+/* ── Cards ──────────────────────────────────────────── */
 
 .infoTile,
 .formCard,
@@ -210,17 +221,16 @@
 .accountCard,
 .callout,
 .listCard {
-  border-radius: 18px;
-  border: 0;
+  border-radius: 3px;
 }
 
 .infoTile,
 .formCard,
 .lessonCard,
 .listCard {
-  background: var(--surface);
-  padding: 16px 18px;
-  backdrop-filter: blur(10px);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  padding: 16px;
 }
 
 .infoTile strong,
@@ -228,117 +238,123 @@
 .listCard strong {
   display: block;
   margin-top: 4px;
-  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-strong);
 }
 
 .infoTile p,
 .lessonCard p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  line-height: 1.55;
-  font-size: 0.9rem;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
 .accountCard {
-  background:
-    linear-gradient(180deg, rgba(45, 211, 154, 0.08), rgba(45, 211, 154, 0.02)),
-    var(--surface);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  padding: 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  padding: 16px;
   display: flex;
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
+  border-radius: 3px;
 }
 
 .accountLabel {
-  display: inline-flex;
-  margin-bottom: 8px;
+  display: inline-block;
+  margin-bottom: 4px;
   color: var(--brand);
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .accountAddress {
   display: block;
-  font-size: 1.2rem;
-  letter-spacing: -0.02em;
-  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-strong);
 }
 
 .accountSubtle {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 13px;
 }
 
+/* ── Action cards ───────────────────────────────────── */
+
 .actionCard {
-  min-height: 150px;
-  padding: 18px;
-  border-radius: 20px;
-  border: 0;
-  background:
-    linear-gradient(180deg, rgba(45, 211, 154, 0.08), rgba(45, 211, 154, 0.02)),
-    var(--surface);
+  padding: 16px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   text-decoration: none;
   color: var(--ink);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  transition: transform 160ms ease, background-color 160ms ease;
+  gap: 4px;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .actionCard:hover {
-  transform: translateY(-2px);
-  background:
-    linear-gradient(180deg, rgba(45, 211, 154, 0.1), rgba(45, 211, 154, 0.03)),
-    var(--surface);
+  border-color: rgba(45, 212, 155, 0.25);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .actionCard strong {
-  font-size: 1.05rem;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-strong);
 }
 
 .actionCard span:last-child {
   color: var(--muted);
-  font-size: 0.9rem;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .actionEyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-  font-weight: 800;
+  letter-spacing: 0.06em;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--brand);
 }
+
+/* ── Form elements ──────────────────────────────────── */
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   color: var(--muted);
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .input {
   width: 100%;
-  padding: 13px 14px;
-  border-radius: 16px;
+  padding: 10px 12px;
+  border-radius: 3px;
   border: 1px solid var(--border-strong);
-  background: rgba(1, 10, 18, 0.65);
-  color: var(--ink);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ink-strong);
+  font-size: 14px;
   outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input:focus {
-  border-color: rgba(45, 211, 154, 0.5);
-  box-shadow: 0 0 0 4px rgba(45, 211, 154, 0.12);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(45, 212, 155, 0.12);
 }
+
+/* ── Buttons ────────────────────────────────────────── */
 
 .primaryButton,
 .secondaryButton,
@@ -347,11 +363,13 @@
 .segmentActive,
 .iconButton,
 .textLink {
-  border-radius: 16px;
+  border-radius: 3px;
   border: 1px solid transparent;
-  font-weight: 800;
+  font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
   text-decoration: none;
+  transition: all 0.15s ease;
 }
 
 .primaryButton,
@@ -360,240 +378,279 @@
 .segment,
 .segmentActive,
 .iconButton {
-  padding: 12px 14px;
+  padding: 8px 14px;
 }
 
 .primaryButton {
-  background: linear-gradient(180deg, var(--accent), #bddf37);
-  color: #183001;
+  background: var(--brand);
+  color: #0b0e13;
+  border-color: var(--brand);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--brand-strong);
 }
 
 .primaryButton:disabled,
 .secondaryButton:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.4;
 }
 
 .secondaryButton {
-  background: rgba(45, 211, 154, 0.12);
-  color: #d5ffe8;
-  border-color: rgba(45, 211, 154, 0.18);
+  background: var(--brand-muted);
+  color: var(--brand-strong);
+  border-color: rgba(45, 212, 155, 0.12);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: rgba(45, 212, 155, 0.2);
 }
 
 .ghostButton {
   background: transparent;
-  color: rgba(239, 252, 246, 0.82);
-  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--muted);
+  border-color: var(--border-strong);
+}
+
+.ghostButton:hover {
+  color: var(--ink);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .segment,
 .segmentActive {
-  background: rgba(255, 255, 255, 0.02);
-  color: rgba(239, 252, 246, 0.76);
-  border-color: rgba(255, 255, 255, 0.12);
-  padding: 10px 14px;
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border-strong);
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .segmentActive {
-  background: rgba(45, 211, 154, 0.16);
-  color: #d8ffe9;
-  border-color: rgba(45, 211, 154, 0.24);
+  background: var(--brand-muted);
+  color: var(--brand-strong);
+  border-color: rgba(45, 212, 155, 0.2);
 }
 
 .iconButton {
-  background: rgba(45, 211, 154, 0.12);
-  color: #d8ffe9;
-  border-color: rgba(45, 211, 154, 0.2);
+  background: var(--surface-raised);
+  color: var(--muted);
+  border-color: var(--border-strong);
+  font-size: 12px;
+}
+
+.iconButton:hover {
+  color: var(--ink);
 }
 
 .textLink {
-  padding: 8px 0;
+  padding: 0;
   color: var(--brand);
-  font-size: 0.84rem;
+  font-size: 12px;
+  border: none;
+  background: none;
 }
+
+.textLink:hover {
+  color: var(--brand-strong);
+}
+
+/* ── Notices / Callouts ────────────────────────────── */
 
 .notice,
 .callout,
 .calloutInline {
   color: var(--muted);
-  line-height: 1.55;
+  line-height: 1.5;
+  font-size: 13px;
 }
 
 .callout {
-  background: rgba(45, 211, 154, 0.08);
-  border: 1px solid rgba(45, 211, 154, 0.16);
-  padding: 16px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .callout strong,
 .calloutInline {
   color: var(--ink);
+  font-size: 13px;
 }
 
 .calloutInline {
-  margin-top: 6px;
-  font-size: 0.9rem;
-  font-weight: 700;
+  margin-top: 4px;
+  font-weight: 600;
 }
+
+/* ── Metric helpers ─────────────────────────────────── */
 
 .metricStack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .metricStrip {
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: rgba(45, 211, 154, 0.1);
-  border: 1px solid rgba(45, 211, 154, 0.18);
+  padding: 12px 14px;
+  border-radius: 3px;
+  background: var(--brand-muted);
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  color: #d8ffe9;
-  font-weight: 800;
+  color: var(--brand-strong);
+  font-weight: 600;
+  font-size: 13px;
 }
+
+/* ── List cards ─────────────────────────────────────── */
 
 .listTop {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .listMetrics {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   color: var(--muted);
-  font-size: 0.84rem;
+  font-size: 12px;
 }
 
 .inlineChip {
-  background: rgba(45, 211, 154, 0.16);
-  color: #c7ffe3;
+  background: var(--brand-muted);
+  color: var(--brand-strong);
 }
 
+/* ── Lesson / education ─────────────────────────────── */
+
 .lessonCard {
-  background:
-    linear-gradient(180deg, rgba(45, 211, 154, 0.08), rgba(45, 211, 154, 0)),
-    var(--surface-quiet);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
 }
 
 .bulletList {
-  margin: 12px 0 0;
-  padding-left: 18px;
+  margin: 10px 0 0;
+  padding-left: 16px;
   color: var(--muted);
-  line-height: 1.65;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .bulletList li + li {
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .inlineCode {
-  font-family: 'Courier New', monospace;
-  background: rgba(45, 211, 154, 0.16);
-  border-radius: 8px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
   padding: 2px 6px;
 }
+
+/* ── Status chips ───────────────────────────────────── */
 
 .statusChipSafe,
 .statusChipWatch,
 .statusChipDanger {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
 }
 
 .statusChipSafe {
-  background: rgba(74, 222, 128, 0.2);
-  color: #a7f3c0;
+  background: rgba(74, 222, 128, 0.12);
+  color: #6ee7a8;
 }
 
 .statusChipWatch {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fde68a;
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
 }
 
 .statusChipDanger {
-  background: rgba(248, 113, 113, 0.2);
-  color: #fecaca;
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
 }
+
+/* ── V3-specific ────────────────────────────────────── */
 
 .v3Metrics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 8px;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 12px;
 }
 
 .v3ActionGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
 }
 
 .v3ActionCard {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
 }
 
 .v3ActionCardActive {
-  border-color: rgba(45, 211, 154, 0.35);
+  border-color: rgba(45, 212, 155, 0.3);
+  background: rgba(45, 212, 155, 0.04);
 }
 
 .v3TxCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: var(--surface);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
+  gap: 8px;
+  padding: 16px;
+  border-radius: 3px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
 }
 
 .v3Kv {
   display: grid;
-  gap: 8px;
-  font-size: 0.86rem;
+  gap: 6px;
+  font-size: 12px;
   color: var(--muted);
 }
 
 .v3Mono {
-  font-family: 'Courier New', monospace;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
   word-break: break-all;
 }
 
-@media (min-width: 1200px) {
-  .shell {
-    gap: 28px;
-  }
+/* ── Responsive ─────────────────────────────────────── */
 
+@media (min-width: 1100px) {
   .gridTwoWide {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  }
-
-  .gridTwo {
-    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    grid-template-columns: 1.1fr 1fr;
   }
 }
 
-@media (max-width: 980px) {
-  .metrics,
-  .gridTwoWide,
-  .actionGrid {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .page {
+    padding: 14px 12px 48px;
+  }
+
+  .hero {
+    padding: 18px;
+    border-radius: 3px;
   }
 
   .heroRow,
@@ -603,33 +660,32 @@
 
   .heroWallet {
     width: 100%;
-  }
-}
-
-@media (max-width: 720px) {
-  .page {
-    padding: 16px 12px 36px;
+    min-width: 0;
   }
 
-  .hero {
-    padding: 18px;
-    border-radius: 22px;
-  }
-
+  .metrics,
+  .gridTwoWide,
   .gridTwo,
+  .actionGrid {
+    grid-template-columns: 1fr;
+  }
+
   .listMetrics,
   .v3Metrics {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 
   .walletActions,
   .accountButtons,
-  .toggleRow,
   .dualActionRow {
     flex-direction: column;
   }
 
   .walletConnect {
     width: 100%;
+  }
+
+  .heroTitle {
+    font-size: 22px;
   }
 }
