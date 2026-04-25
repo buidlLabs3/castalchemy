@@ -6,10 +6,20 @@ import { formatEther, parseEther } from 'viem';
 import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import styles from '../page.module.css';
 import { getV3Adapter, useV3Positions, v3Config, ZERO_ADDRESS } from '@/lib/v3';
-import type { PreparedV3Transaction } from '@/lib/v3';
+import type { PreparedV3Transaction, V3ProtocolState } from '@/lib/v3';
 import { useWallet } from '@/lib/wallet/hooks';
 
-type V3Action = 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'burn';
+type V3Action = 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'burn' | 'selfLiquidate';
+
+function getEtherscanBaseUrl(chainId: number): string {
+  switch (chainId) {
+    case 1: return 'https://etherscan.io';
+    case 10: return 'https://optimistic.etherscan.io';
+    case 42161: return 'https://arbiscan.io';
+    case 11155111: return 'https://sepolia.etherscan.io';
+    default: return 'https://etherscan.io';
+  }
+}
 
 function formatTokenAmount(value: bigint): string {
   return Number.parseFloat(formatEther(value)).toFixed(4);
@@ -52,12 +62,14 @@ export default function MiniAppV3PreviewPage() {
   const [isPreparing, setIsPreparing] = useState(false);
   const [mockSubmissionId, setMockSubmissionId] = useState<string | null>(null);
   const [requestedAction, setRequestedAction] = useState<string | null>(null);
+  const [protocolState, setProtocolState] = useState<V3ProtocolState | null>(null);
 
   const preferredAction: V3Action =
     requestedAction === 'withdraw' ||
     requestedAction === 'borrow' ||
     requestedAction === 'repay' ||
-    requestedAction === 'burn'
+    requestedAction === 'burn' ||
+    requestedAction === 'selfLiquidate'
       ? requestedAction
       : 'deposit';
   const selectedPosition = positions.find((position) => position.tokenId.toString() === selectedTokenId) ?? null;
@@ -73,7 +85,11 @@ export default function MiniAppV3PreviewPage() {
     !!address &&
     !!selectedPosition &&
     !!withdrawAmountValue &&
-    withdrawAmountValue <= selectedPosition.collateral;
+    withdrawAmountValue <= selectedPosition.maxWithdrawable;
+  const canPrepareSelfLiquidate =
+    !!address &&
+    !!selectedPosition &&
+    selectedPosition.debt > 0n;
   const canPrepareBorrow =
     !!address &&
     !!selectedPosition &&
@@ -117,6 +133,13 @@ export default function MiniAppV3PreviewPage() {
       reload();
     }
   }, [isSuccess, reload]);
+
+  useEffect(() => {
+    if (!isEnabled || !isConnected) return;
+    const adapter = getV3Adapter();
+    if (!adapter.isReady()) return;
+    adapter.getProtocolState().then(setProtocolState).catch(() => {});
+  }, [isEnabled, isConnected]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -198,8 +221,8 @@ export default function MiniAppV3PreviewPage() {
       return;
     }
 
-    if (withdrawAmountValue > selectedPosition.collateral) {
-      setTxError('Withdraw amount exceeds the selected position collateral.');
+    if (withdrawAmountValue > selectedPosition.maxWithdrawable) {
+      setTxError('Withdraw amount exceeds the maximum safe withdrawable amount.');
       return;
     }
 
@@ -322,6 +345,35 @@ export default function MiniAppV3PreviewPage() {
         });
       },
       'Failed to prepare burn transaction.',
+    );
+  };
+
+  const handlePrepareSelfLiquidate = async () => {
+    if (!address) {
+      setTxError('Connect a wallet before preparing a transaction.');
+      return;
+    }
+
+    if (!selectedTokenId || !selectedPosition) {
+      setTxError('Choose a position before preparing a self-liquidation.');
+      return;
+    }
+
+    if (selectedPosition.debt === 0n) {
+      setTxError('This position has no debt to self-liquidate.');
+      return;
+    }
+
+    await prepareTransaction(
+      `Self-liquidate position #${selectedTokenId}`,
+      async () => {
+        const adapter = getV3Adapter();
+        return adapter.prepareSelfLiquidate({
+          accountId: BigInt(selectedTokenId),
+          recipient: address,
+        });
+      },
+      'Failed to prepare self-liquidation transaction.',
     );
   };
 
@@ -457,13 +509,25 @@ export default function MiniAppV3PreviewPage() {
                     <div className={styles.v3Metrics}>
                       <span>Collateral {formatTokenAmount(position.collateral)}</span>
                       <span>Debt {formatTokenAmount(position.debt)}</span>
+                      <span>Earmarked {formatTokenAmount(position.earmarked)}</span>
                       <span>Available {formatTokenAmount(position.availableCredit)}</span>
+                      <span>Max withdraw {formatTokenAmount(position.maxWithdrawable)}</span>
                       <span>Health {formatHealth(position.healthFactor)}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </section>
+
+            {protocolState && (protocolState.depositsPaused || protocolState.loansPaused) && (
+              <div className={styles.callout}>
+                <strong>⚠️ Protocol Alert</strong>
+                <span>
+                  {protocolState.depositsPaused && 'Deposits are currently paused by the protocol. '}
+                  {protocolState.loansPaused && 'Loans/minting are currently paused by the protocol.'}
+                </span>
+              </div>
+            )}
 
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
@@ -501,11 +565,13 @@ export default function MiniAppV3PreviewPage() {
                   <div className={styles.v3Metrics}>
                     <span>Collateral {formatTokenAmount(selectedPosition.collateral)}</span>
                     <span>Debt {formatTokenAmount(selectedPosition.debt)}</span>
+                    <span>Earmarked {formatTokenAmount(selectedPosition.earmarked)}</span>
                     <span>Available {formatTokenAmount(selectedPosition.availableCredit)}</span>
+                    <span>Max withdraw {formatTokenAmount(selectedPosition.maxWithdrawable)}</span>
                     <span>Health {formatHealth(selectedPosition.healthFactor)}</span>
                   </div>
                 ) : (
-                  <p>Select a position to enable withdraw, borrow, repay, and burn actions.</p>
+                  <p>Select a position to enable withdraw, borrow, repay, burn, and self-liquidation actions.</p>
                 )}
               </div>
 
@@ -557,7 +623,7 @@ export default function MiniAppV3PreviewPage() {
                     />
                   </label>
                   <p>
-                    Max withdrawable: {selectedPosition ? formatTokenAmount(selectedPosition.collateral) : '0.0000'}
+                    Max withdrawable: {selectedPosition ? formatTokenAmount(selectedPosition.maxWithdrawable) : '0.0000'}
                   </p>
                   <button
                     className={styles.primaryButton}
@@ -654,6 +720,27 @@ export default function MiniAppV3PreviewPage() {
                     Prepare burn
                   </button>
                 </div>
+
+                <div
+                  className={`${styles.lessonCard} ${styles.v3ActionCard} ${
+                    preferredAction === 'selfLiquidate' ? styles.v3ActionCardActive : ''
+                  }`}
+                >
+                  <span className={styles.infoLabel}>Self-liquidate</span>
+                  <strong>Close debt using your own collateral</strong>
+                  <p>
+                    Uses your collateral to fully repay debt. Only available for healthy (overcollateralized) positions.
+                    Remaining collateral is sent to your wallet.
+                  </p>
+                  <p>Position debt: {selectedPosition ? formatTokenAmount(selectedPosition.debt) : '0.0000'}</p>
+                  <button
+                    className={styles.primaryButton}
+                    onClick={handlePrepareSelfLiquidate}
+                    disabled={isPreparing || !canPrepareSelfLiquidate}
+                  >
+                    Prepare self-liquidation
+                  </button>
+                </div>
               </div>
 
               {txError && <div className={styles.callout}>{txError}</div>}
@@ -719,7 +806,7 @@ export default function MiniAppV3PreviewPage() {
                         <span className={styles.infoLabel}>Transaction hash</span>
                         <span className={styles.v3Mono}>{txHash}</span>
                         <a
-                          href={`https://sepolia.etherscan.io/tx/${txHash}`}
+                          href={`${getEtherscanBaseUrl(v3Config.chainId)}/tx/${txHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={styles.textLink}
