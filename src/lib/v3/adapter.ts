@@ -13,13 +13,20 @@ import type {
   PrepareDepositParams,
   PrepareMintParams,
   PrepareRepayParams,
+  PrepareSelfLiquidateParams,
   PrepareWithdrawParams,
   PreparedV3Transaction,
   V3Adapter,
   V3PositionDetail,
   V3PositionSummary,
+  V3ProtocolState,
 } from './types';
 
+/**
+ * Classify health factor into a user-friendly state.
+ * Uses the minimumCollateralization from the contract when available,
+ * but falls back to reasonable defaults.
+ */
 function getHealthState(healthFactor: number): V3PositionSummary['healthState'] {
   if (healthFactor >= 2) {
     return 'safe';
@@ -98,7 +105,7 @@ class ContractV3Adapter implements V3Adapter {
       functionName: 'getCDP',
       args: [tokenId],
     })) as [bigint, bigint, bigint];
-    const [collateralValue, maxBorrowable] = await Promise.all([
+    const [collateralValue, maxBorrowable, maxWithdrawable] = await Promise.all([
       client.readContract({
         address: v3Config.alchemistAddress,
         abi: alchemistV3ReadAbi,
@@ -109,6 +116,12 @@ class ContractV3Adapter implements V3Adapter {
         address: v3Config.alchemistAddress,
         abi: alchemistV3ReadAbi,
         functionName: 'getMaxBorrowable',
+        args: [tokenId],
+      }),
+      client.readContract({
+        address: v3Config.alchemistAddress,
+        abi: alchemistV3ReadAbi,
+        functionName: 'getMaxWithdrawable',
         args: [tokenId],
       }),
     ]);
@@ -124,6 +137,7 @@ class ContractV3Adapter implements V3Adapter {
       earmarked,
       collateralValue,
       maxBorrowable,
+      maxWithdrawable,
       availableCredit,
       healthFactor,
       healthState: getHealthState(healthFactor),
@@ -181,6 +195,42 @@ class ContractV3Adapter implements V3Adapter {
     } catch {
       return null;
     }
+  }
+
+  async getProtocolState(): Promise<V3ProtocolState> {
+    this.assertReady();
+    const client = this.getPublicClient();
+
+    const [
+      depositsPaused,
+      loansPaused,
+      minimumCollateralization,
+      globalMinimumCollateralization,
+      depositCap,
+      totalDebt,
+      totalDeposited,
+      totalUnderlyingValue,
+    ] = await Promise.all([
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'depositsPaused' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'loansPaused' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'minimumCollateralization' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'globalMinimumCollateralization' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'depositCap' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'totalDebt' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'getTotalDeposited' }),
+      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'getTotalUnderlyingValue' }),
+    ]);
+
+    return {
+      depositsPaused: depositsPaused as boolean,
+      loansPaused: loansPaused as boolean,
+      minimumCollateralization: minimumCollateralization as bigint,
+      globalMinimumCollateralization: globalMinimumCollateralization as bigint,
+      depositCap: depositCap as bigint,
+      totalDebt: totalDebt as bigint,
+      totalDeposited: totalDeposited as bigint,
+      totalUnderlyingValue: totalUnderlyingValue as bigint,
+    };
   }
 
   async prepareDeposit(params: PrepareDepositParams): Promise<PreparedV3Transaction> {
@@ -268,6 +318,21 @@ class ContractV3Adapter implements V3Adapter {
         abi: alchemistV3WriteAbi,
         functionName: 'repay',
         args: [params.amount, params.recipientTokenId],
+      }),
+      value: 0n,
+    };
+  }
+
+  async prepareSelfLiquidate(params: PrepareSelfLiquidateParams): Promise<PreparedV3Transaction> {
+    this.assertReady();
+
+    return {
+      chainId: v3Config.chainId,
+      to: v3Config.alchemistAddress,
+      data: encodeFunctionData({
+        abi: alchemistV3WriteAbi,
+        functionName: 'selfLiquidate',
+        args: [params.accountId, params.recipient],
       }),
       value: 0n,
     };

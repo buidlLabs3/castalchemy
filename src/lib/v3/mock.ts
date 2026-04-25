@@ -5,12 +5,14 @@ import type {
   PrepareDepositParams,
   PrepareMintParams,
   PrepareRepayParams,
+  PrepareSelfLiquidateParams,
   PrepareWithdrawParams,
   PreparedV3Transaction,
   V3Adapter,
   V3HealthState,
   V3PositionDetail,
   V3PositionSummary,
+  V3ProtocolState,
 } from './types';
 
 const WEI = 10n ** 18n;
@@ -58,6 +60,7 @@ function buildPosition(owner: Address, tokenId: bigint, slot: number): V3Positio
   const earmarked = debt / 10n;
   const collateralValue = collateral;
   const maxBorrowable = (collateralValue * MAX_LTV_BPS) / BPS;
+  const maxWithdrawable = collateral - (debt * BPS) / MAX_LTV_BPS;
   const availableCredit = maxBorrowable > debt ? maxBorrowable - debt : 0n;
   const healthFactor = calculateHealthFactor(collateralValue, debt);
 
@@ -69,6 +72,7 @@ function buildPosition(owner: Address, tokenId: bigint, slot: number): V3Positio
     earmarked,
     collateralValue,
     maxBorrowable,
+    maxWithdrawable: maxWithdrawable > 0n ? maxWithdrawable : 0n,
     availableCredit,
     healthFactor,
     healthState: getHealthState(healthFactor),
@@ -128,6 +132,19 @@ export class MockV3Adapter implements V3Adapter {
     };
   }
 
+  async getProtocolState(): Promise<V3ProtocolState> {
+    return {
+      depositsPaused: false,
+      loansPaused: false,
+      minimumCollateralization: (WEI * 11n) / 10n, // 110%
+      globalMinimumCollateralization: (WEI * 12n) / 10n, // 120%
+      depositCap: 100_000n * WEI,
+      totalDebt: 42_000n * WEI,
+      totalDeposited: 85_000n * WEI,
+      totalUnderlyingValue: 88_000n * WEI,
+    };
+  }
+
   async prepareDeposit(params: PrepareDepositParams): Promise<PreparedV3Transaction> {
     assertPositive(params.amount, 'Deposit amount');
     return toTransaction(resolveAlchemistAddress());
@@ -150,6 +167,10 @@ export class MockV3Adapter implements V3Adapter {
 
   async prepareRepay(params: PrepareRepayParams): Promise<PreparedV3Transaction> {
     assertPositive(params.amount, 'Repay amount');
+    return toTransaction(resolveAlchemistAddress());
+  }
+
+  async prepareSelfLiquidate(_params: PrepareSelfLiquidateParams): Promise<PreparedV3Transaction> {
     return toTransaction(resolveAlchemistAddress());
   }
 }

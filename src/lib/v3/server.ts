@@ -124,7 +124,7 @@ function assertWithinLimit(amount: bigint, limit: bigint, message: string) {
 }
 
 export function assertV3Withdrawable(position: V3PositionSummary, amount: bigint) {
-  assertWithinLimit(amount, position.collateral, 'Withdraw amount exceeds the selected position collateral.');
+  assertWithinLimit(amount, position.maxWithdrawable, 'Withdraw amount exceeds the maximum safe withdrawable amount for this position.');
 }
 
 export function assertV3Borrowable(position: V3PositionSummary, amount: bigint) {
