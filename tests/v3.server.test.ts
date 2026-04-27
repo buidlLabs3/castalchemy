@@ -6,6 +6,7 @@ const OWNER_ADDRESS = '0x0000000000000000000000000000000000000012';
 
 process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3 = 'true';
 process.env.NEXT_PUBLIC_ALCHEMIX_V3_MODE = 'mock';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '11155111';
 process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS = ALCHEMIST_ADDRESS;
 
 const configModule = await import('../src/lib/v3/config');
@@ -69,13 +70,13 @@ test('limit validators reject out-of-range values', async () => {
   const adapter = getServerV3Adapter();
   const [position] = await adapter.getPositions(OWNER_ADDRESS);
 
-  assert.doesNotThrow(() => assertV3Withdrawable(position, position.collateral));
+  assert.doesNotThrow(() => assertV3Withdrawable(position, position.maxWithdrawable));
   assert.doesNotThrow(() => assertV3Borrowable(position, position.availableCredit));
   assert.doesNotThrow(() => assertV3DebtAmount(position, position.debt, 'repay'));
 
   assert.throws(
-    () => assertV3Withdrawable(position, position.collateral + 1n),
-    /Withdraw amount exceeds the selected position collateral/,
+    () => assertV3Withdrawable(position, position.maxWithdrawable + 1n),
+    /Withdraw amount exceeds the maximum safe withdrawable amount/,
   );
   assert.throws(
     () => assertV3Borrowable(position, position.availableCredit + 1n),

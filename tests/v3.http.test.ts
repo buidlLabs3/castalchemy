@@ -7,6 +7,7 @@ const ALT_RECIPIENT = '0x0000000000000000000000000000000000000042';
 
 process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3 = 'true';
 process.env.NEXT_PUBLIC_ALCHEMIX_V3_MODE = 'mock';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '11155111';
 process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS = ALCHEMIST_ADDRESS;
 
 const adapterModule = await import('../src/lib/v3/adapter');
