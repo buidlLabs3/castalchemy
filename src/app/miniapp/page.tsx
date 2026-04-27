@@ -32,7 +32,8 @@ import {
   getTipConversionPreview,
   type TipAsset,
 } from '@/lib/social/tips';
-import { useV3Positions, v3Config } from '@/lib/v3';
+import { getV3Adapter, useV3Positions, v3Config } from '@/lib/v3';
+import type { V3ProtocolState } from '@/lib/v3';
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useWallet } from '@/lib/wallet/hooks';
 
@@ -58,6 +59,16 @@ function formatTokenAmount(value: bigint): string {
 
 function formatHealth(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : 'INF';
+}
+
+function getChainLabel(chainId: number): string {
+  switch (chainId) {
+    case 1: return 'Ethereum';
+    case 10: return 'Optimism';
+    case 42161: return 'Arbitrum';
+    case 11155111: return 'Sepolia';
+    default: return `Chain ${chainId}`;
+  }
 }
 
 function shortenAddress(address?: string): string {
@@ -89,6 +100,7 @@ export default function MiniApp() {
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [tipTrackingBusy, setTipTrackingBusy] = useState(false);
   const [trackingMessage, setTrackingMessage] = useState<string | null>(null);
+  const [protocolState, setProtocolState] = useState<V3ProtocolState | null>(null);
 
   const {
     address,
@@ -146,6 +158,13 @@ export default function MiniApp() {
 
     initSDK();
   }, []);
+
+  useEffect(() => {
+    if (!isV3Enabled || !isConnected) return;
+    const adapter = getV3Adapter();
+    if (!adapter.isReady()) return;
+    adapter.getProtocolState().then(setProtocolState).catch(() => {});
+  }, [isV3Enabled, isConnected]);
 
   const refreshTracking = async () => {
     const search = new URLSearchParams({
@@ -377,12 +396,14 @@ export default function MiniApp() {
             <div>
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>Alchemix x Farcaster</span>
-                <span className={styles.networkBadge}>Sepolia preview</span>
+                <span className={styles.networkBadge}>
+                  {v3Config.mode === 'contracts' ? getChainLabel(v3Config.chainId) : 'Preview mode'}
+                </span>
               </div>
               <h1 className={styles.heroTitle}>CastAlchemy</h1>
               <p className={styles.heroSubtitle}>
-                A cleaner, contract-light dashboard focused on the flows we can ship before V3
-                contracts land.
+                Self-repaying loans and yield strategies powered by Alchemix V3,
+                accessible from Farcaster.
               </p>
             </div>
             <div className={styles.heroWallet}>
@@ -458,13 +479,13 @@ export default function MiniApp() {
                   <div className={styles.gridTwo}>
                     <div className={styles.infoTile}>
                       <span className={styles.infoLabel}>Live now</span>
-                      <strong>Frames + analytics</strong>
-                      <p>Market, education, alerts, and social preview work without final V3.</p>
+                      <strong>V3 Contracts + Frames</strong>
+                      <p>Alchemix V3 is live on mainnet. Connect your wallet to manage positions.</p>
                     </div>
                     <div className={styles.infoTile}>
-                      <span className={styles.infoLabel}>On deck</span>
-                      <strong>Tip-to-invest + referrals</strong>
-                      <p>We can keep shipping social and wallet flows while contracts stay private.</p>
+                      <span className={styles.infoLabel}>Available</span>
+                      <strong>Full V3 Suite</strong>
+                      <p>Deposit, borrow, repay, burn, and self-liquidate through the V3 builder.</p>
                     </div>
                   </div>
                 </>
@@ -667,6 +688,31 @@ export default function MiniApp() {
                   </div>
                 )}
 
+                {isV3Enabled && protocolState && (
+                  <div className={styles.metricStack}>
+                    <div className={styles.metricStrip}>
+                      <span>Protocol state</span>
+                      <strong>
+                        {protocolState.depositsPaused || protocolState.loansPaused
+                          ? '⚠️ Partially paused'
+                          : '✅ Operational'}
+                      </strong>
+                    </div>
+                    <div className={styles.gridTwo}>
+                      <div className={styles.infoTile}>
+                        <span className={styles.infoLabel}>Total deposited</span>
+                        <strong>{formatTokenAmount(protocolState.totalDeposited)}</strong>
+                        <p>TVL: {formatTokenAmount(protocolState.totalUnderlyingValue)}</p>
+                      </div>
+                      <div className={styles.infoTile}>
+                        <span className={styles.infoLabel}>Total debt</span>
+                        <strong>{formatTokenAmount(protocolState.totalDebt)}</strong>
+                        <p>Cap: {formatTokenAmount(protocolState.depositCap)}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {isV3Enabled && previewPosition && (
                   <div className={styles.metricStack}>
                     <div className={styles.metricStrip}>
@@ -676,13 +722,13 @@ export default function MiniApp() {
                     <div className={styles.gridTwo}>
                       <div className={styles.infoTile}>
                         <span className={styles.infoLabel}>Collateral</span>
-                        <strong>{formatTokenAmount(previewPosition.collateral)} ETH</strong>
-                        <p>Debt: {formatTokenAmount(previewPosition.debt)} ETH</p>
+                        <strong>{formatTokenAmount(previewPosition.collateral)}</strong>
+                        <p>Debt: {formatTokenAmount(previewPosition.debt)} · Earmarked: {formatTokenAmount(previewPosition.earmarked)}</p>
                       </div>
                       <div className={styles.infoTile}>
-                        <span className={styles.infoLabel}>Available</span>
-                        <strong>{formatTokenAmount(previewPosition.availableCredit)} ETH</strong>
-                        <p>Health: {formatHealth(previewPosition.healthFactor)}</p>
+                        <span className={styles.infoLabel}>Available credit</span>
+                        <strong>{formatTokenAmount(previewPosition.availableCredit)}</strong>
+                        <p>Max withdraw: {formatTokenAmount(previewPosition.maxWithdrawable)} · Health: {formatHealth(previewPosition.healthFactor)}</p>
                       </div>
                     </div>
                   </div>
