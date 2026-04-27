@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 import { formatEther, parseEther } from 'viem';
 import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import styles from '../page.module.css';
-import { getV3Adapter, useV3Positions, v3Config, ZERO_ADDRESS } from '@/lib/v3';
-import type { PreparedV3Transaction, V3ProtocolState } from '@/lib/v3';
+import { getV3Adapter, useV3Positions, useV3ProtocolState, v3Config, ZERO_ADDRESS } from '@/lib/v3';
+import type { PreparedV3Transaction } from '@/lib/v3';
 import { useWallet } from '@/lib/wallet/hooks';
 
 type V3Action = 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'burn' | 'selfLiquidate';
@@ -62,7 +62,8 @@ export default function MiniAppV3PreviewPage() {
   const [isPreparing, setIsPreparing] = useState(false);
   const [mockSubmissionId, setMockSubmissionId] = useState<string | null>(null);
   const [requestedAction, setRequestedAction] = useState<string | null>(null);
-  const [protocolState, setProtocolState] = useState<V3ProtocolState | null>(null);
+
+  const { protocolState } = useV3ProtocolState();
 
   const preferredAction: V3Action =
     requestedAction === 'withdraw' ||
@@ -133,13 +134,6 @@ export default function MiniAppV3PreviewPage() {
       reload();
     }
   }, [isSuccess, reload]);
-
-  useEffect(() => {
-    if (!isEnabled || !isConnected) return;
-    const adapter = getV3Adapter();
-    if (!adapter.isReady()) return;
-    adapter.getProtocolState().then(setProtocolState).catch(() => {});
-  }, [isEnabled, isConnected]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

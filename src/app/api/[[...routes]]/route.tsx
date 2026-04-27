@@ -211,7 +211,7 @@ function getPositionActionConfig(action: PositionActionName) {
         accent: '#f59e0b',
         buttonLabel: 'Withdraw',
         limitLine: (position: V3PositionSummary) =>
-          `Available collateral: ${formatFrameAmount(position.collateral)} ETH`,
+          `Max withdrawable: ${formatFrameAmount(position.maxWithdrawable)}`,
         validate: (position: V3PositionSummary, amount: bigint) => assertV3Withdrawable(position, amount),
         prepare: (adapter: V3Adapter, position: V3PositionSummary, amount: bigint, wallet: Address) =>
           adapter.prepareWithdraw({
@@ -692,9 +692,9 @@ app.frame('/frames/dashboard', async (c) => {
       image: renderCard('My Positions', [
         `Wallet: ${shortenAddress(viewerAddress)}`,
         `Viewing #${position.tokenId.toString()} (${index + 1}/${positions.length})`,
-        `Collateral: ${formatFrameAmount(position.collateral)} ETH`,
-        `Debt: ${formatFrameAmount(position.debt)} ETH`,
-        `Available credit: ${formatFrameAmount(position.availableCredit)} ETH`,
+        `Collateral: ${formatFrameAmount(position.collateral)}`,
+        `Debt: ${formatFrameAmount(position.debt)}`,
+        `Available credit: ${formatFrameAmount(position.availableCredit)}`,
         `Health: ${formatHealthFactor(position.healthFactor)} (${position.healthState})`,
       ]),
       intents: [
@@ -752,9 +752,9 @@ app.frame('/frames/position', async (c) => {
 
     return c.res({
       image: renderCard(`Position #${position.tokenId.toString()}`, [
-        `Collateral: ${formatFrameAmount(position.collateral)} ETH`,
-        `Debt: ${formatFrameAmount(position.debt)} ETH`,
-        `Available credit: ${formatFrameAmount(position.availableCredit)} ETH`,
+        `Collateral: ${formatFrameAmount(position.collateral)} · Earmarked: ${formatFrameAmount(position.earmarked)}`,
+        `Debt: ${formatFrameAmount(position.debt)}`,
+        `Credit: ${formatFrameAmount(position.availableCredit)} · Max withdraw: ${formatFrameAmount(position.maxWithdrawable)}`,
         `Health: ${formatHealthFactor(position.healthFactor)} (${position.healthState})`,
       ]),
       intents: [
@@ -767,8 +767,8 @@ app.frame('/frames/position', async (c) => {
         <Button key="repay" action={`/frames/position/repay?tokenId=${position.tokenId.toString()}`}>
           Repay
         </Button>,
-        <Button key="burn" action={`/frames/position/burn?tokenId=${position.tokenId.toString()}`}>
-          Burn
+        <Button key="liquidate" action={`/frames/position/self-liquidate?tokenId=${position.tokenId.toString()}`}>
+          Self-Liquidate
         </Button>,
       ],
     });
@@ -795,6 +795,86 @@ app.frame('/frames/position/borrow', (c) => renderPositionActionFrame(c, 'borrow
 app.frame('/frames/position/repay', (c) => renderPositionActionFrame(c, 'repay'));
 app.frame('/frames/position/burn', (c) => renderPositionActionFrame(c, 'burn'));
 
+app.frame('/frames/position/self-liquidate', async (c) => {
+  if (!v3Config.enabled) {
+    return c.res(renderDisabledFrame('The V3 feature flag is off.'));
+  }
+
+  const viewerAddress = getFrameAddress(c.frameData?.address);
+
+  if (!viewerAddress) {
+    return c.res(renderMissingWalletFrame('This frame client did not provide a wallet address yet.'));
+  }
+
+  try {
+    const position = await getOwnedV3Position(viewerAddress, getSearchParam(c, 'tokenId'));
+    const backTarget = `/frames/position?tokenId=${position.tokenId.toString()}`;
+
+    if (c.transactionId) {
+      return c.res({
+        image: renderCard('Self-Liquidation Submitted', [
+          'Your collateral is being used to close debt.',
+          `Position: #${position.tokenId.toString()}`,
+          `Tx: ${c.transactionId.slice(0, 10)}...${c.transactionId.slice(-6)}`,
+        ], '#f97316'),
+        intents: [
+          <Button key="back" action={backTarget}>
+            Position
+          </Button>,
+          <Button key="dashboard" action="/frames/dashboard">
+            Dashboard
+          </Button>,
+        ],
+      });
+    }
+
+    if (position.debt === 0n) {
+      return c.res({
+        image: renderCard('No Debt', [
+          `Position #${position.tokenId.toString()} has no debt.`,
+          'Self-liquidation requires outstanding debt.',
+        ], '#f59e0b'),
+        intents: [
+          <Button key="back" action={backTarget}>
+            Back
+          </Button>,
+        ],
+      });
+    }
+
+    const txTarget = `/frames/transactions/self-liquidate?tokenId=${position.tokenId.toString()}`;
+
+    return c.res({
+      image: renderCard('Review Self-Liquidation', [
+        `Position: #${position.tokenId.toString()}`,
+        `Current debt: ${formatFrameAmount(position.debt)}`,
+        `Collateral: ${formatFrameAmount(position.collateral)}`,
+        'Collateral repays debt. Remainder returns to your wallet.',
+      ], '#f97316'),
+      intents: [
+        <Button.Transaction key="submit" action={`/frames/position/self-liquidate?tokenId=${position.tokenId.toString()}`} target={txTarget}>
+          Confirm
+        </Button.Transaction>,
+        <Button key="back" action={backTarget}>
+          Cancel
+        </Button>,
+      ],
+    });
+  } catch (error) {
+    return c.res({
+      image: renderCard('Action Error', [
+        formatError(error),
+        'Check the selected position.',
+      ], '#ef4444'),
+      intents: [
+        <Button key="dashboard" action="/frames/dashboard">
+          Dashboard
+        </Button>,
+      ],
+    });
+  }
+});
+
 app.transaction('/frames/transactions/deposit', async (c) => {
   try {
     const amount = parseV3AmountInput(getSearchParam(c, 'amount') ?? c.inputText, 'Deposit amount');
@@ -819,6 +899,31 @@ app.transaction('/frames/transactions/withdraw', (c) => handlePositionTransactio
 app.transaction('/frames/transactions/borrow', (c) => handlePositionTransaction(c, 'borrow'));
 app.transaction('/frames/transactions/repay', (c) => handlePositionTransaction(c, 'repay'));
 app.transaction('/frames/transactions/burn', (c) => handlePositionTransaction(c, 'burn'));
+
+app.transaction('/frames/transactions/self-liquidate', async (c) => {
+  try {
+    const wallet = parseV3Recipient(c.address, 'Transaction wallet');
+    const tokenIdParam = getSearchParam(c, 'tokenId');
+    const position = await getOwnedV3Position(wallet, tokenIdParam);
+
+    if (position.debt === 0n) {
+      return c.error({ message: 'This position has no debt to self-liquidate.', statusCode: 400 });
+    }
+
+    const adapter = getServerV3Adapter();
+    const tx = await adapter.prepareSelfLiquidate({
+      accountId: position.tokenId,
+      recipient: wallet,
+    });
+
+    return c.send(toV3SendTransaction(tx));
+  } catch (error) {
+    return c.error({
+      message: formatError(error),
+      statusCode: 400,
+    });
+  }
+});
 
 export const GET = handle(app);
 export const POST = handle(app);

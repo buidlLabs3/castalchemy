@@ -1,29 +1,39 @@
 /**
  * Wallet configuration for Farcaster + WalletConnect
- * Network: Sepolia Testnet (for safe testing)
+ * Supports Ethereum Mainnet (V3 production) and Sepolia (testing).
  */
 import { http, createConfig } from 'wagmi';
-import { sepolia } from 'wagmi/chains';
+import { mainnet, sepolia, arbitrum, optimism } from 'wagmi/chains';
 import { injected, walletConnect } from 'wagmi/connectors';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '471d16ca38bb523b158cef3957cbfa7d';
 
-// Use multiple RPC endpoints for redundancy
-const sepoliaRpcUrls = [
-  'https://rpc.sepolia.org',
-  'https://ethereum-sepolia.publicnode.com',
-  'https://sepolia.gateway.tenderly.co',
-  'https://rpc2.sepolia.org',
-];
+// Primary chain is determined by V3 config
+const v3ChainId = Number(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID || '1');
 
 export const config = createConfig({
-  chains: [sepolia],
+  chains: [mainnet, arbitrum, optimism, sepolia],
   connectors: [
     injected({ target: 'metaMask' }),
     walletConnect({ projectId }),
   ],
   transports: {
-    [sepolia.id]: http(sepoliaRpcUrls[0], {
+    [mainnet.id]: http(process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL || 'https://eth.llamarpc.com', {
+      batch: true,
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
+    [arbitrum.id]: http('https://arb1.arbitrum.io/rpc', {
+      batch: true,
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
+    [optimism.id]: http('https://mainnet.optimism.io', {
+      batch: true,
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
+    [sepolia.id]: http('https://rpc.sepolia.org', {
       batch: true,
       retryCount: 3,
       retryDelay: 1000,
@@ -31,6 +41,5 @@ export const config = createConfig({
   },
 });
 
-export { sepolia };
-export const NETWORK = 'sepolia';
-export const CHAIN_ID = 11155111;
+export { mainnet, sepolia, arbitrum, optimism };
+export const V3_CHAIN_ID = v3ChainId;

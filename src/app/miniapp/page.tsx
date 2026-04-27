@@ -32,8 +32,7 @@ import {
   getTipConversionPreview,
   type TipAsset,
 } from '@/lib/social/tips';
-import { getV3Adapter, useV3Positions, v3Config } from '@/lib/v3';
-import type { V3ProtocolState } from '@/lib/v3';
+import { useV3Positions, useV3ProtocolState, v3Config } from '@/lib/v3';
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useWallet } from '@/lib/wallet/hooks';
 
@@ -100,7 +99,8 @@ export default function MiniApp() {
   const [trackingBusy, setTrackingBusy] = useState(false);
   const [tipTrackingBusy, setTipTrackingBusy] = useState(false);
   const [trackingMessage, setTrackingMessage] = useState<string | null>(null);
-  const [protocolState, setProtocolState] = useState<V3ProtocolState | null>(null);
+
+  const { protocolState } = useV3ProtocolState();
 
   const {
     address,
@@ -158,13 +158,6 @@ export default function MiniApp() {
 
     initSDK();
   }, []);
-
-  useEffect(() => {
-    if (!isV3Enabled || !isConnected) return;
-    const adapter = getV3Adapter();
-    if (!adapter.isReady()) return;
-    adapter.getProtocolState().then(setProtocolState).catch(() => {});
-  }, [isV3Enabled, isConnected]);
 
   const refreshTracking = async () => {
     const search = new URLSearchParams({
