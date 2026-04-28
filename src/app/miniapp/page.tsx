@@ -118,7 +118,6 @@ export default function MiniApp() {
     positions: v3Positions,
     isLoading: v3Loading,
     error: v3Error,
-    isEnabled: isV3Enabled,
     reload: reloadV3,
   } = useV3Positions(address);
 
@@ -390,7 +389,7 @@ export default function MiniApp() {
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>Alchemix x Farcaster</span>
                 <span className={styles.networkBadge}>
-                  {v3Config.mode === 'contracts' ? getChainLabel(v3Config.chainId) : 'Preview mode'}
+                  {getChainLabel(v3Config.chainId)}
                 </span>
               </div>
               <h1 className={styles.heroTitle}>CastAlchemy</h1>
@@ -414,17 +413,17 @@ export default function MiniApp() {
 
           <div className={styles.metrics}>
             <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>V3 mode</span>
-              <strong>{v3Config.mode}</strong>
+              <span className={styles.metricLabel}>Network</span>
+              <strong>{getChainLabel(v3Config.chainId)}</strong>
               <span className={styles.metricFoot}>
-                {isV3Enabled ? 'Feature flag enabled' : 'Feature flag disabled'}
+                {v3Config.mode === 'contracts' ? 'Live on-chain' : 'Mock mode'}
               </span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Positions</span>
               <strong>{v3Positions.length}</strong>
               <span className={styles.metricFoot}>
-                {previewPosition ? `Watching #${previewPosition.tokenId}` : 'No preview positions yet'}
+                {previewPosition ? `Active: #${previewPosition.tokenId}` : 'No positions yet'}
               </span>
             </div>
             <div className={styles.metricCard}>
@@ -557,8 +556,8 @@ export default function MiniApp() {
                 <div className={styles.gridTwo}>
                   <div className={styles.infoTile}>
                     <span className={styles.infoLabel}>Quick transfer</span>
-                    <strong>Send ETH on Sepolia</strong>
-                    <p>Move funds from the connected wallet while V3 logic stays in preview mode.</p>
+                    <strong>Send ETH</strong>
+                    <p>Move funds from the connected wallet to any address on the active network.</p>
                     <button className={styles.primaryButton} onClick={() => setFinancePanel('send')}>
                       Open send form
                     </button>
@@ -622,35 +621,30 @@ export default function MiniApp() {
               </div>
 
               <div className={styles.actionGrid}>
-                <Link className={styles.actionCard} href="/miniapp/deposit">
-                  <span className={styles.actionEyebrow}>V2</span>
-                  <strong>Deposit</strong>
-                  <span>Deposit collateral into an alUSD or alETH vault.</span>
-                </Link>
-                <Link className={styles.actionCard} href="/miniapp/positions">
-                  <span className={styles.actionEyebrow}>V2</span>
-                  <strong>My Positions</strong>
-                  <span>View your V2 vault positions, health factors, and balances.</span>
-                </Link>
                 <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
-                  <span className={styles.actionEyebrow}>V3 preview</span>
-                  <strong>V3 Builder</strong>
-                  <span>Open the V3 transaction builder for tokenId-based positions.</span>
+                  <span className={styles.actionEyebrow}>V3</span>
+                  <strong>Deposit</strong>
+                  <span>Deposit collateral into a V3 position and start earning yield.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/v3">
+                  <span className={styles.actionEyebrow}>V3</span>
+                  <strong>Manage Positions</strong>
+                  <span>Withdraw, borrow, repay, burn, or self-liquidate your V3 positions.</span>
                 </Link>
                 <a className={styles.actionCard} href="/api/frames" target="_blank" rel="noopener noreferrer">
                   <span className={styles.actionEyebrow}>Frames</span>
-                  <strong>Open frames</strong>
-                  <span>Inspect live Frog routes for analytics, learning, and social flows.</span>
+                  <strong>Farcaster Frames</strong>
+                  <span>Interact with your positions through Farcaster transaction frames.</span>
                 </a>
                 <a className={styles.actionCard} href="/api/cast-action" target="_blank" rel="noopener noreferrer">
-                  <span className={styles.actionEyebrow}>M2</span>
+                  <span className={styles.actionEyebrow}>Social</span>
                   <strong>⚗️ Cast Action</strong>
                   <span>Install the Alchemix This cast action for Farcaster.</span>
                 </a>
                 <a className={styles.actionCard} href="/api/tips" target="_blank" rel="noopener noreferrer">
-                  <span className={styles.actionEyebrow}>M3</span>
-                  <strong>Tip preview</strong>
-                  <span>Preview tip conversion without needing V3 contracts.</span>
+                  <span className={styles.actionEyebrow}>Tips</span>
+                  <strong>Tip-to-invest</strong>
+                  <span>Convert social tips into yield-generating V3 deposits.</span>
                 </a>
               </div>
             </section>
@@ -667,21 +661,14 @@ export default function MiniApp() {
                 <div className={styles.panelHeader}>
                   <div>
                     <p className={styles.eyebrow}>Position watch</p>
-                    <h2 className={styles.panelTitle}>V3 preview status</h2>
+                    <h2 className={styles.panelTitle}>Positions and protocol</h2>
                   </div>
                   <button className={styles.iconButton} onClick={reloadV3}>
                     Reload
                   </button>
                 </div>
 
-                {!isV3Enabled && (
-                  <div className={styles.callout}>
-                    Enable <code className={styles.inlineCode}>NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true</code>{' '}
-                    to turn on the tokenId-based preview flow.
-                  </div>
-                )}
-
-                {isV3Enabled && protocolState && (
+                {protocolState && (
                   <div className={styles.metricStack}>
                     <div className={styles.metricStrip}>
                       <span>Protocol state</span>
@@ -706,7 +693,7 @@ export default function MiniApp() {
                   </div>
                 )}
 
-                {isV3Enabled && previewPosition && (
+                {previewPosition && (
                   <div className={styles.metricStack}>
                     <div className={styles.metricStrip}>
                       <span>Working position</span>
@@ -727,11 +714,11 @@ export default function MiniApp() {
                   </div>
                 )}
 
-                {isV3Enabled && !previewPosition && !v3Loading && (
-                  <div className={styles.callout}>No preview positions detected for this wallet yet.</div>
+                {!previewPosition && !v3Loading && (
+                  <div className={styles.callout}>No positions detected for this wallet yet. Deposit collateral to get started.</div>
                 )}
 
-                {v3Loading && <div className={styles.callout}>Loading position preview...</div>}
+                {v3Loading && <div className={styles.callout}>Loading positions...</div>}
                 {v3Error && <div className={styles.callout}>{v3Error}</div>}
               </section>
 

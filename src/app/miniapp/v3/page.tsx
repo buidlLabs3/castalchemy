@@ -44,7 +44,7 @@ function parseAmountInput(value: string): bigint | null {
   }
 }
 
-export default function MiniAppV3PreviewPage() {
+export default function MiniAppV3Page() {
   const { address, isConnected, isConnecting, walletMode } = useWallet();
   const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address);
   const { sendTransaction, data: txHash, error: sendError, isPending: isSending } = useSendTransaction();
@@ -401,49 +401,49 @@ export default function MiniAppV3PreviewPage() {
           <div className={styles.heroRow}>
             <div>
               <div className={styles.badgeRow}>
-                <span className={styles.brandBadge}>Alchemix V3 Preview</span>
-                <span className={styles.networkBadge}>Transaction builder</span>
+                <span className={styles.brandBadge}>Alchemix V3</span>
+                <span className={styles.networkBadge}>{getEtherscanBaseUrl(v3Config.chainId).includes('sepolia') ? 'Sepolia' : 'Mainnet'}</span>
               </div>
-              <h1 className={styles.heroTitle}>Position + Transaction Flow</h1>
+              <h1 className={styles.heroTitle}>Manage Positions</h1>
               <p className={styles.heroSubtitle}>
-                Prepare deposit, withdraw, borrow, repay, and burn actions using the same
-                wallet-native layout as the main mini app.
+                Deposit, withdraw, borrow, repay, burn, and self-liquidate your
+                Alchemix V3 positions.
               </p>
             </div>
             <div className={styles.heroWallet}>
               <span className={styles.walletLabel}>Wallet</span>
               <strong>{walletSummary}</strong>
               <Link href="/miniapp" className={styles.secondaryButton}>
-                Back to wallet
+                Dashboard
               </Link>
             </div>
           </div>
 
           <div className={styles.metrics}>
             <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>Feature flag</span>
-              <strong>{isEnabled ? 'Enabled' : 'Disabled'}</strong>
-              <span className={styles.metricFoot}>`NEXT_PUBLIC_ENABLE_ALCHEMIX_V3`</span>
+              <span className={styles.metricLabel}>Network</span>
+              <strong>{v3Config.chainId}</strong>
+              <span className={styles.metricFoot}>Target chain</span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Mode</span>
               <strong>{v3Config.mode}</strong>
-              <span className={styles.metricFoot}>Adapter execution mode</span>
+              <span className={styles.metricFoot}>{v3Config.mode === 'contracts' ? 'Live on-chain' : 'Mock mode'}</span>
             </div>
             <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>Chain</span>
-              <strong>{v3Config.chainId}</strong>
-              <span className={styles.metricFoot}>Current target chain</span>
+              <span className={styles.metricLabel}>Positions</span>
+              <strong>{positions.length}</strong>
+              <span className={styles.metricFoot}>{positions.length ? `Active` : 'None yet'}</span>
             </div>
           </div>
         </section>
 
         {!isEnabled && (
           <div className={styles.callout}>
-            <strong>V3 preview is disabled.</strong>
+            <strong>V3 is not enabled.</strong>
             <span>
-              Enable <code className={styles.inlineCode}>NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true</code> in
-              your env to use this screen.
+              Set <code className={styles.inlineCode}>NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true</code> in
+              your environment to use this screen.
             </span>
           </div>
         )}
@@ -788,8 +788,8 @@ export default function MiniAppV3PreviewPage() {
 
                     {!canSimulatePreparedTx && !canSubmitPreparedTx && (
                       <p>
-                        External wallet mode plus contract-backed V3 config is required for signing
-                        in this preview.
+                        External wallet mode plus contract-backed V3 config is required for live
+                        transaction signing.
                       </p>
                     )}
 

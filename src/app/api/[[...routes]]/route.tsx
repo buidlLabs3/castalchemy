@@ -397,7 +397,7 @@ app.frame('/frames', (c) => {
     image: renderCard('CastAlchemy V3', [
       'Frames now use the shared V3 adapter.',
       detail,
-      'Use Deposit, Analytics, Learn, or My Positions to explore the current preview.',
+      'Use Deposit, Analytics, Learn, or My Positions to get started.',
     ]),
     intents: [
       <Button key="deposit" action="/frames/deposit">
