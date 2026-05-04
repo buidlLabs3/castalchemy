@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatEther, type Address } from 'viem';
 import styles from './page.module.css';
-import { canUseContractV3, getV3ChainMetadata, useV3Positions, useV3ProtocolState, v3Config } from '@/lib/v3';
+import { canUseContractV3, getV3ChainMetadata, useV3Positions, useV3ProtocolState } from '@/lib/v3';
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useWallet } from '@/lib/wallet/hooks';
 
