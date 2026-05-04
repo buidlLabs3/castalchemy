@@ -1,33 +1,23 @@
-# CastAlchemy ⚗️
+# CastAlchemy
 
-Self-repaying loans on Farcaster via Alchemix protocol.
+Alchemix V3 on Farcaster: a Mini App and Frame surface for wallet connection,
+position visibility, and transaction preparation.
 
-## Quick Start
+## Supported Networks
 
-1. **Open Mini App:** https://castalchemy.vercel.app/miniapp
-2. **Connect Wallet:** Auto-connects in Farcaster or use external wallet
-3. **Get Test ETH:** https://sepoliafaucet.com (Sepolia testnet)
-4. **Test Features:** Send, Receive, Copy address, Switch wallets
+- Ethereum Mainnet (`1`) for production.
+- Sepolia (`11155111`) for testing.
 
-## Features
+The wallet config, frame transaction helpers, and V3 adapter are intentionally
+limited to those two networks.
 
-- 🎭 Farcaster native wallet support
-- 🔗 External wallet (MetaMask, WalletConnect)
-- 📤 Send ETH transactions
-- 📥 Receive with QR code
-- 💎 Alchemix positions dashboard
-- 🧪 Sepolia testnet (safe testing)
+## App Surfaces
 
-## Tech Stack
-
-- Next.js 14
-- Farcaster Mini App SDK
-- Wagmi + RainbowKit
-- Sepolia Testnet
-
-## Alchemix V3 Integration
-
-Coming February 6th, 2026
+- `/miniapp` - focused dashboard for wallet state, protocol state, and position health.
+- `/miniapp/v3` - V3 transaction builder for deposit, withdraw, borrow, repay, burn, and self-liquidation.
+- `/miniapp/analytics` - read-only market and automation previews.
+- `/miniapp/learn` - curated V3 education path.
+- `/miniapp/social` - referral and tip-intent growth tools, separated from the core transaction flow.
 
 ## Development
 
@@ -36,10 +26,16 @@ npm install
 npm run dev
 ```
 
-## Deployment
+## Verification
 
-Deployed on Vercel: https://castalchemy.vercel.app
+```bash
+npm run type-check
+npm run test:unit
+```
 
----
+## Configuration
 
-Built with ⚗️ for Farcaster
+Copy `env.example`, then set `NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL` and every
+`NEXT_PUBLIC_ALCHEMIX_V3_*` contract address for your target chain (mainnet or
+Sepolia). Reads, transaction preparation, and the Mini App require a complete
+configuration; there is no offline mock adapter.

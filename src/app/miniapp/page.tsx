@@ -3,54 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { formatEther, parseEther, type Address } from 'viem';
-import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { formatEther, type Address } from 'viem';
 import styles from './page.module.css';
-import { getBotBriefing, type BotBriefingKind } from '@/lib/automation/briefings';
-import {
-  getEducationLesson,
-  getNextEducationStep,
-  getPreviousEducationStep,
-} from '@/lib/education/lessons';
-import {
-  formatMarketDelta,
-  formatMarketPercent,
-  formatMarketUsd,
-  getMarketSnapshots,
-} from '@/lib/market/snapshots';
-import {
-  formatSocialPercent,
-  formatSocialUsd,
-  getSocialPreview,
-  type LeaderboardWindow,
-  type SocialPrivacyMode,
-} from '@/lib/social/preview';
-import {
-  formatTipAssetAmount,
-  formatTipUsd,
-  getTipAssetOptions,
-  getTipConversionPreview,
-  type TipAsset,
-} from '@/lib/social/tips';
-import { useV3Positions, useV3ProtocolState, v3Config } from '@/lib/v3';
+import { canUseContractV3, getV3ChainMetadata, useV3Positions, useV3ProtocolState, v3Config } from '@/lib/v3';
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useWallet } from '@/lib/wallet/hooks';
-
-type FinancePanel = 'overview' | 'send' | 'receive';
-
-interface ReferralSnapshot {
-  code: string;
-  clicks: number;
-  conversions: number;
-  conversionRate: number;
-  projectedRewardUsd: number;
-}
-
-interface TipSummarySnapshot {
-  totalIntents: number;
-  totalIntendedUsd: number;
-  totalProjectedDepositUsd: number;
-}
 
 function formatTokenAmount(value: bigint): string {
   return Number.parseFloat(formatEther(value)).toFixed(4);
@@ -58,16 +15,6 @@ function formatTokenAmount(value: bigint): string {
 
 function formatHealth(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : 'INF';
-}
-
-function getChainLabel(chainId: number): string {
-  switch (chainId) {
-    case 1: return 'Ethereum';
-    case 10: return 'Optimism';
-    case 42161: return 'Arbitrum';
-    case 11155111: return 'Sepolia';
-    default: return `Chain ${chainId}`;
-  }
 }
 
 function shortenAddress(address?: string): string {
@@ -79,29 +26,12 @@ function shortenAddress(address?: string): string {
 }
 
 export default function MiniApp() {
-  const [financePanel, setFinancePanel] = useState<FinancePanel>('overview');
-  const [recipient, setRecipient] = useState('');
-  const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
-  const [lessonStep, setLessonStep] = useState(1);
-  const [briefingKind, setBriefingKind] = useState<BotBriefingKind>('daily');
-  const [milestoneProgress, setMilestoneProgress] = useState(50);
-  const [leaderboardWindow, setLeaderboardWindow] = useState<LeaderboardWindow>('weekly');
-  const [socialPrivacyMode, setSocialPrivacyMode] = useState<SocialPrivacyMode>('public');
-  const [socialComparisonEnabled, setSocialComparisonEnabled] = useState(true);
-  const [tipAsset, setTipAsset] = useState<TipAsset>('USDC');
-  const [tipAmount, setTipAmount] = useState('25');
-  const [trackedReferral, setTrackedReferral] = useState<ReferralSnapshot | null>(null);
-  const [tipSummary, setTipSummary] = useState<TipSummarySnapshot | null>(null);
-  const [trackingBusy, setTrackingBusy] = useState(false);
-  const [tipTrackingBusy, setTipTrackingBusy] = useState(false);
-  const [trackingMessage, setTrackingMessage] = useState<string | null>(null);
 
-  const { protocolState } = useV3ProtocolState();
-
+  const chain = getV3ChainMetadata();
   const {
     address,
     isConnected,
@@ -112,181 +42,39 @@ export default function MiniApp() {
     switchToFarcaster,
     disconnect,
   } = useWallet();
-  const { sendTransaction, data: txHash, isPending, error } = useSendTransaction();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
   const {
-    positions: v3Positions,
-    isLoading: v3Loading,
-    error: v3Error,
-    reload: reloadV3,
+    positions,
+    isLoading: positionsLoading,
+    error: positionsError,
+    reload: reloadPositions,
   } = useV3Positions(address);
+  const {
+    protocolState,
+    isLoading: protocolLoading,
+    error: protocolError,
+    reload: reloadProtocol,
+  } = useV3ProtocolState();
 
-  const activeLesson = getEducationLesson(lessonStep);
-  const previewPosition = v3Positions[0] ?? null;
-  const previewHealthState = previewPosition?.healthState ?? 'safe';
-  const activeBriefing = getBotBriefing(briefingKind, {
-    healthState: previewHealthState,
-    progress: milestoneProgress,
-  });
-  const socialPreview = getSocialPreview({
-    window: leaderboardWindow,
-    privacyMode: socialPrivacyMode,
-    socialComparisonEnabled,
-  });
-  const tipOptions = getTipAssetOptions();
-  const tipPreview = getTipConversionPreview({
-    asset: tipAsset,
-    amount: tipAmount,
-  });
-  const connectedWalletLabel = isConnecting
+  const primaryPosition = positions[0] ?? null;
+  const protocolPaused = !!protocolState && (protocolState.depositsPaused || protocolState.loansPaused);
+  const walletSummary = isConnecting
     ? 'Checking wallet'
     : isConnected && address
       ? shortenAddress(address)
       : 'Connect wallet';
-  const referralSummary = trackedReferral ?? socialPreview.referral;
 
   useEffect(() => {
     async function initSDK() {
       try {
         const { sdk } = await import('@farcaster/miniapp-sdk');
-        sdk.actions.ready();
+        await sdk.actions.ready();
       } catch {
-        // Outside Farcaster, keep the page usable.
+        // Outside Farcaster, the browser wallet flow remains available.
       }
     }
 
     initSDK();
   }, []);
-
-  const refreshTracking = async () => {
-    const search = new URLSearchParams({
-      window: leaderboardWindow,
-      privacy: socialPrivacyMode,
-      compare: socialComparisonEnabled ? 'on' : 'off',
-      code: referralSummary.code,
-    });
-    const [socialResponse, tipsResponse] = await Promise.all([
-      fetch(`/api/social?${search.toString()}`, { method: 'GET' }),
-      fetch(`/api/tips?asset=${tipAsset}&amount=${tipAmount}&code=${referralSummary.code}`, {
-        method: 'GET',
-      }),
-    ]);
-
-    if (socialResponse.ok) {
-      const payload = (await socialResponse.json()) as {
-        social?: { referral?: ReferralSnapshot };
-        tracking?: { tipIntents?: number };
-      };
-      if (payload.social?.referral) {
-        setTrackedReferral(payload.social.referral);
-      }
-      if (payload.tracking?.tipIntents !== undefined) {
-        setTipSummary((current) => ({
-          totalIntents: payload.tracking?.tipIntents ?? 0,
-          totalIntendedUsd: current?.totalIntendedUsd ?? 0,
-          totalProjectedDepositUsd: current?.totalProjectedDepositUsd ?? 0,
-        }));
-      }
-    }
-
-    if (tipsResponse.ok) {
-      const payload = (await tipsResponse.json()) as {
-        summary?: TipSummarySnapshot;
-      };
-      if (payload.summary) {
-        setTipSummary(payload.summary);
-      }
-    }
-  };
-
-  useEffect(() => {
-    refreshTracking().catch((error) => {
-      console.error('Failed to refresh tracking:', error);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaderboardWindow, socialPrivacyMode, socialComparisonEnabled, tipAsset, tipAmount]);
-
-  const trackReferralAction = async (action: 'click' | 'conversion') => {
-    setTrackingBusy(true);
-    setTrackingMessage(null);
-
-    try {
-      const response = await fetch('/api/social', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action,
-          code: referralSummary.code,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Unable to track referral action.');
-      }
-
-      const payload = (await response.json()) as {
-        referral?: ReferralSnapshot;
-      };
-
-      if (payload.referral) {
-        setTrackedReferral(payload.referral);
-      }
-      setTrackingMessage(action === 'click' ? 'Referral click tracked.' : 'Referral conversion tracked.');
-    } catch (error) {
-      console.error(error);
-      setTrackingMessage('Failed to track referral action.');
-    } finally {
-      setTrackingBusy(false);
-    }
-  };
-
-  const trackTipIntent = async () => {
-    setTipTrackingBusy(true);
-    setTrackingMessage(null);
-
-    try {
-      const response = await fetch('/api/tips', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          asset: tipAsset,
-          amount: tipAmount,
-          wallet: address ?? null,
-          referralCode: referralSummary.code,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Unable to track tip intent.');
-      }
-
-      const payload = (await response.json()) as {
-        event?: { id: string };
-        summary?: TipSummarySnapshot;
-        referral?: ReferralSnapshot;
-      };
-
-      if (payload.summary) {
-        setTipSummary(payload.summary);
-      }
-      if (payload.referral) {
-        setTrackedReferral(payload.referral);
-      }
-
-      setTrackingMessage(
-        payload.event ? `Tip intent recorded (${payload.event.id.slice(0, 12)}...)` : 'Tip intent recorded.',
-      );
-    } catch (error) {
-      console.error(error);
-      setTrackingMessage('Failed to track tip intent.');
-    } finally {
-      setTipTrackingBusy(false);
-    }
-  };
 
   const loadBalance = async () => {
     if (!address) {
@@ -313,8 +101,7 @@ export default function MiniApp() {
         provider = win.ethereum;
       }
 
-      const nextBalance = await fetchBalance(address as Address, provider);
-      setBalance(nextBalance);
+      setBalance(await fetchBalance(address as Address, provider));
     } catch (nextError) {
       console.error('Failed to load balance:', nextError);
       setBalanceError('Balance unavailable');
@@ -330,22 +117,6 @@ export default function MiniApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, isConnected, walletMode]);
 
-  useEffect(() => {
-    if (!isSuccess) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      loadBalance();
-      setRecipient('');
-      setAmount('');
-      setFinancePanel('overview');
-    }, 1800);
-
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuccess]);
-
   const copyAddress = async () => {
     if (!address) {
       return;
@@ -353,32 +124,14 @@ export default function MiniApp() {
 
     await navigator.clipboard.writeText(address);
     setCopied(true);
-
-    window.setTimeout(() => {
-      setCopied(false);
-    }, 1600);
+    window.setTimeout(() => setCopied(false), 1600);
   };
 
-  const handleSend = () => {
-    if (!recipient || !amount) {
-      return;
-    }
-
-    sendTransaction({
-      to: recipient as Address,
-      value: parseEther(amount),
-    });
+  const reloadCoreData = () => {
+    reloadProtocol();
+    reloadPositions();
+    loadBalance();
   };
-
-  const financeStatus = isPending
-    ? 'Sending transfer...'
-    : isConfirming
-      ? 'Waiting for confirmation...'
-      : isSuccess
-        ? 'Transfer confirmed.'
-        : error
-          ? error.message
-          : null;
 
   return (
     <main className={styles.page}>
@@ -387,26 +140,25 @@ export default function MiniApp() {
           <div className={styles.heroRow}>
             <div>
               <div className={styles.badgeRow}>
-                <span className={styles.brandBadge}>Alchemix x Farcaster</span>
-                <span className={styles.networkBadge}>
-                  {getChainLabel(v3Config.chainId)}
-                </span>
+                <span className={styles.brandBadge}>CastAlchemy</span>
+                <span className={styles.networkBadge}>{chain.shortLabel}</span>
+                <span className={styles.networkBadge}>{canUseContractV3() ? 'Live V3' : 'V3 not configured'}</span>
               </div>
-              <h1 className={styles.heroTitle}>CastAlchemy</h1>
+              <h1 className={styles.heroTitle}>Alchemix V3 from Farcaster</h1>
               <p className={styles.heroSubtitle}>
-                Self-repaying loans and yield strategies powered by Alchemix V3,
-                accessible from Farcaster.
+                A focused command surface for deposits, borrowing, repayment, and position health on
+                Ethereum mainnet or Sepolia.
               </p>
             </div>
             <div className={styles.heroWallet}>
               <span className={styles.walletLabel}>Active wallet</span>
-              <strong>{connectedWalletLabel}</strong>
+              <strong>{walletSummary}</strong>
               <span className={styles.walletHint}>
                 {walletMode === 'farcaster'
-                  ? 'Using Farcaster wallet'
+                  ? 'Farcaster wallet'
                   : walletMode === 'external'
-                    ? 'Using external wallet'
-                    : 'Choose Farcaster or external'}
+                    ? 'External wallet'
+                    : 'No wallet selected'}
               </span>
             </div>
           </div>
@@ -414,86 +166,79 @@ export default function MiniApp() {
           <div className={styles.metrics}>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Network</span>
-              <strong>{getChainLabel(v3Config.chainId)}</strong>
+              <strong>{chain.shortLabel}</strong>
+              <span className={styles.metricFoot}>{chain.label}</span>
+            </div>
+            <div className={styles.metricCard}>
+              <span className={styles.metricLabel}>Protocol</span>
+              <strong>{protocolPaused ? 'Paused' : protocolLoading ? 'Loading' : 'Operational'}</strong>
               <span className={styles.metricFoot}>
-                {v3Config.mode === 'contracts' ? 'Live on-chain' : 'Mock mode'}
+                {protocolState ? 'State loaded from V3 adapter' : 'Awaiting state'}
               </span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Positions</span>
-              <strong>{v3Positions.length}</strong>
+              <strong>{positionsLoading ? '...' : positions.length}</strong>
               <span className={styles.metricFoot}>
-                {previewPosition ? `Active: #${previewPosition.tokenId}` : 'No positions yet'}
-              </span>
-            </div>
-            <div className={styles.metricCard}>
-              <span className={styles.metricLabel}>Tip-ready</span>
-              <strong>{tipPreview.asset}</strong>
-              <span className={styles.metricFoot}>
-                {formatTipAssetAmount(tipPreview.asset, tipPreview.normalizedAmount)} selected
+                {primaryPosition ? `Primary #${primaryPosition.tokenId.toString()}` : 'None detected'}
               </span>
             </div>
           </div>
         </section>
 
         {!isConnected || !address ? (
-          <section className={styles.stack}>
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <p className={styles.eyebrow}>Wallet setup</p>
-                  <h2 className={styles.panelTitle}>
-                    {isConnecting ? 'Checking wallet providers' : 'Choose how to connect'}
-                  </h2>
-                </div>
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}>
+              <div>
+                <p className={styles.eyebrow}>Wallet setup</p>
+                <h2 className={styles.panelTitle}>
+                  {isConnecting ? 'Checking wallet providers' : 'Connect to continue'}
+                </h2>
               </div>
+            </div>
 
-              {isConnecting ? (
-                <div className={styles.callout}>
-                  We are resolving Farcaster context and external wallet availability before showing
-                  actions.
-                </div>
-              ) : (
-                <>
-                  <div className={styles.walletActions}>
-                    <div className={styles.walletConnect}>
-                      <ConnectButton />
-                    </div>
-                    {isFarcasterAvailable && (
-                      <button className={styles.secondaryButton} onClick={switchToFarcaster}>
-                        Use Farcaster wallet
-                      </button>
-                    )}
-                    <button className={styles.ghostButton} onClick={switchToExternal}>
-                      External wallet mode
+            {isConnecting ? (
+              <div className={styles.callout}>Resolving Farcaster and browser wallet context.</div>
+            ) : (
+              <>
+                <div className={styles.walletActions}>
+                  <div className={styles.walletConnect}>
+                    <ConnectButton />
+                  </div>
+                  {isFarcasterAvailable && (
+                    <button className={styles.secondaryButton} onClick={switchToFarcaster}>
+                      Use Farcaster wallet
                     </button>
+                  )}
+                  <button className={styles.ghostButton} onClick={switchToExternal}>
+                    External wallet mode
+                  </button>
+                </div>
+                <div className={styles.gridTwo}>
+                  <div className={styles.infoTile}>
+                    <span className={styles.infoLabel}>Production networks</span>
+                    <strong>Mainnet and Sepolia only</strong>
+                    <p>All wallet and frame transaction paths are constrained to Ethereum mainnet or Sepolia.</p>
                   </div>
-                  <div className={styles.gridTwo}>
-                    <div className={styles.infoTile}>
-                      <span className={styles.infoLabel}>Live now</span>
-                      <strong>V3 Contracts + Frames</strong>
-                      <p>Alchemix V3 is live on mainnet. Connect your wallet to manage positions.</p>
-                    </div>
-                    <div className={styles.infoTile}>
-                      <span className={styles.infoLabel}>Available</span>
-                      <strong>Full V3 Suite</strong>
-                      <p>Deposit, borrow, repay, burn, and self-liquidate through the V3 builder.</p>
-                    </div>
+                  <div className={styles.infoTile}>
+                    <span className={styles.infoLabel}>Protocol scope</span>
+                    <strong>Alchemix V3</strong>
+                    <p>Older shortcuts redirect into the V3 position builder to avoid mixed protocol flows.</p>
                   </div>
-                </>
-              )}
-            </section>
+                </div>
+              </>
+            )}
           </section>
         ) : (
           <section className={styles.stack}>
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <div>
-                  <p className={styles.eyebrow}>Wallet desk</p>
-                  <h2 className={styles.panelTitle}>Account overview</h2>
+                  <p className={styles.eyebrow}>Account</p>
+                  <h2 className={styles.panelTitle}>Wallet overview</h2>
                 </div>
-                <button className={styles.iconButton} onClick={copyAddress}>
-                  {copied ? 'Copied' : 'Copy address'}
+                <button className={styles.iconButton} onClick={reloadCoreData}>
+                  Refresh
                 </button>
               </div>
 
@@ -512,17 +257,17 @@ export default function MiniApp() {
                   </p>
                 </div>
                 <div className={styles.accountButtons}>
-                  <button className={styles.secondaryButton} onClick={loadBalance}>
-                    Refresh
+                  <button className={styles.secondaryButton} onClick={copyAddress}>
+                    {copied ? 'Copied' : 'Copy address'}
                   </button>
                   {walletMode !== 'farcaster' && isFarcasterAvailable && (
                     <button className={styles.ghostButton} onClick={switchToFarcaster}>
-                      Switch to Farcaster
+                      Farcaster wallet
                     </button>
                   )}
                   {walletMode !== 'external' && (
                     <button className={styles.ghostButton} onClick={switchToExternal}>
-                      Switch to external
+                      External wallet
                     </button>
                   )}
                   <button className={styles.ghostButton} onClick={disconnect}>
@@ -532,127 +277,20 @@ export default function MiniApp() {
               </div>
             </section>
 
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <p className={styles.eyebrow}>Money movement</p>
-                  <h2 className={styles.panelTitle}>Transfer and receive</h2>
-                </div>
-              </div>
-
-              <div className={styles.toggleRow}>
-                {(['overview', 'send', 'receive'] as FinancePanel[]).map((panel) => (
-                  <button
-                    key={panel}
-                    className={panel === financePanel ? styles.segmentActive : styles.segment}
-                    onClick={() => setFinancePanel(panel)}
-                  >
-                    {panel === 'overview' ? 'Overview' : panel === 'send' ? 'Send' : 'Receive'}
-                  </button>
-                ))}
-              </div>
-
-              {financePanel === 'overview' && (
-                <div className={styles.gridTwo}>
-                  <div className={styles.infoTile}>
-                    <span className={styles.infoLabel}>Quick transfer</span>
-                    <strong>Send ETH</strong>
-                    <p>Move funds from the connected wallet to any address on the active network.</p>
-                    <button className={styles.primaryButton} onClick={() => setFinancePanel('send')}>
-                      Open send form
-                    </button>
-                  </div>
-                  <div className={styles.infoTile}>
-                    <span className={styles.infoLabel}>Receive funds</span>
-                    <strong>Share your wallet</strong>
-                    <p>Copy the connected wallet to receive testnet funds or manual team payouts.</p>
-                    <button className={styles.secondaryButton} onClick={() => setFinancePanel('receive')}>
-                      Show receive info
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {financePanel === 'send' && (
-                <div className={styles.formCard}>
-                  <label className={styles.field}>
-                    <span>Recipient</span>
-                    <input
-                      className={styles.input}
-                      value={recipient}
-                      onChange={(event) => setRecipient(event.target.value)}
-                      placeholder="0x..."
-                    />
-                  </label>
-                  <label className={styles.field}>
-                    <span>Amount (ETH)</span>
-                    <input
-                      className={styles.input}
-                      value={amount}
-                      onChange={(event) => setAmount(event.target.value)}
-                      placeholder="0.10"
-                    />
-                  </label>
-                  <button
-                    className={styles.primaryButton}
-                    onClick={handleSend}
-                    disabled={!recipient || !amount || isPending || isConfirming}
-                  >
-                    {isPending ? 'Sending...' : isConfirming ? 'Confirming...' : 'Send ETH'}
-                  </button>
-                  {financeStatus && <div className={styles.notice}>{financeStatus}</div>}
-                </div>
-              )}
-
-              {financePanel === 'receive' && (
-                <div className={styles.callout}>
-                  <strong>{shortenAddress(address)}</strong>
-                  <span>Tap copy above to share the full address.</span>
-                </div>
-              )}
-            </section>
-
-            <section className={styles.panel}>
-              <div className={styles.panelHeader}>
-                <div>
-                  <p className={styles.eyebrow}>Quick actions</p>
-                  <h2 className={styles.panelTitle}>Current product surfaces</h2>
-                </div>
-              </div>
-
-              <div className={styles.actionGrid}>
-                <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
-                  <span className={styles.actionEyebrow}>V3</span>
-                  <strong>Deposit</strong>
-                  <span>Deposit collateral into a V3 position and start earning yield.</span>
-                </Link>
-                <Link className={styles.actionCard} href="/miniapp/v3">
-                  <span className={styles.actionEyebrow}>V3</span>
-                  <strong>Manage Positions</strong>
-                  <span>Withdraw, borrow, repay, burn, or self-liquidate your V3 positions.</span>
-                </Link>
-                <a className={styles.actionCard} href="/api/frames" target="_blank" rel="noopener noreferrer">
-                  <span className={styles.actionEyebrow}>Frames</span>
-                  <strong>Farcaster Frames</strong>
-                  <span>Interact with your positions through Farcaster transaction frames.</span>
-                </a>
-                <a className={styles.actionCard} href="/api/cast-action" target="_blank" rel="noopener noreferrer">
-                  <span className={styles.actionEyebrow}>Social</span>
-                  <strong>⚗️ Cast Action</strong>
-                  <span>Install the Alchemix This cast action for Farcaster.</span>
-                </a>
-                <a className={styles.actionCard} href="/api/tips" target="_blank" rel="noopener noreferrer">
-                  <span className={styles.actionEyebrow}>Tips</span>
-                  <strong>Tip-to-invest</strong>
-                  <span>Convert social tips into yield-generating V3 deposits.</span>
-                </a>
-              </div>
-            </section>
-
-            {trackingMessage && (
+            {(protocolError || positionsError) && (
               <div className={styles.callout}>
-                <strong>Tracking update</strong>
-                <span>{trackingMessage}</span>
+                <strong>Data issue</strong>
+                <span>{protocolError ?? positionsError}</span>
+              </div>
+            )}
+
+            {protocolPaused && (
+              <div className={styles.callout}>
+                <strong>Protocol pause detected</strong>
+                <span>
+                  {protocolState?.depositsPaused ? 'Deposits are paused. ' : ''}
+                  {protocolState?.loansPaused ? 'Borrowing is paused.' : ''}
+                </span>
               </div>
             )}
 
@@ -660,371 +298,107 @@ export default function MiniApp() {
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.eyebrow}>Position watch</p>
-                    <h2 className={styles.panelTitle}>Positions and protocol</h2>
+                    <p className={styles.eyebrow}>Position health</p>
+                    <h2 className={styles.panelTitle}>
+                      {primaryPosition ? `Position #${primaryPosition.tokenId.toString()}` : 'No position selected'}
+                    </h2>
                   </div>
-                  <button className={styles.iconButton} onClick={reloadV3}>
-                    Reload
-                  </button>
+                  <Link href="/miniapp/v3" className={styles.textLink}>
+                    Open builder
+                  </Link>
                 </div>
 
-                {protocolState && (
+                {primaryPosition ? (
                   <div className={styles.metricStack}>
                     <div className={styles.metricStrip}>
-                      <span>Protocol state</span>
-                      <strong>
-                        {protocolState.depositsPaused || protocolState.loansPaused
-                          ? '⚠️ Partially paused'
-                          : '✅ Operational'}
-                      </strong>
-                    </div>
-                    <div className={styles.gridTwo}>
-                      <div className={styles.infoTile}>
-                        <span className={styles.infoLabel}>Total deposited</span>
-                        <strong>{formatTokenAmount(protocolState.totalDeposited)}</strong>
-                        <p>TVL: {formatTokenAmount(protocolState.totalUnderlyingValue)}</p>
-                      </div>
-                      <div className={styles.infoTile}>
-                        <span className={styles.infoLabel}>Total debt</span>
-                        <strong>{formatTokenAmount(protocolState.totalDebt)}</strong>
-                        <p>Cap: {formatTokenAmount(protocolState.depositCap)}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {previewPosition && (
-                  <div className={styles.metricStack}>
-                    <div className={styles.metricStrip}>
-                      <span>Working position</span>
-                      <strong>#{previewPosition.tokenId}</strong>
+                      <span>Health factor</span>
+                      <strong>{formatHealth(primaryPosition.healthFactor)}</strong>
                     </div>
                     <div className={styles.gridTwo}>
                       <div className={styles.infoTile}>
                         <span className={styles.infoLabel}>Collateral</span>
-                        <strong>{formatTokenAmount(previewPosition.collateral)}</strong>
-                        <p>Debt: {formatTokenAmount(previewPosition.debt)} · Earmarked: {formatTokenAmount(previewPosition.earmarked)}</p>
+                        <strong>{formatTokenAmount(primaryPosition.collateral)}</strong>
+                        <p>Debt: {formatTokenAmount(primaryPosition.debt)}</p>
                       </div>
                       <div className={styles.infoTile}>
                         <span className={styles.infoLabel}>Available credit</span>
-                        <strong>{formatTokenAmount(previewPosition.availableCredit)}</strong>
-                        <p>Max withdraw: {formatTokenAmount(previewPosition.maxWithdrawable)} · Health: {formatHealth(previewPosition.healthFactor)}</p>
+                        <strong>{formatTokenAmount(primaryPosition.availableCredit)}</strong>
+                        <p>Max withdraw: {formatTokenAmount(primaryPosition.maxWithdrawable)}</p>
                       </div>
                     </div>
                   </div>
+                ) : (
+                  <div className={styles.callout}>
+                    {positionsLoading ? 'Loading positions...' : 'No V3 positions were found for this wallet.'}
+                  </div>
                 )}
-
-                {!previewPosition && !v3Loading && (
-                  <div className={styles.callout}>No positions detected for this wallet yet. Deposit collateral to get started.</div>
-                )}
-
-                {v3Loading && <div className={styles.callout}>Loading positions...</div>}
-                {v3Error && <div className={styles.callout}>{v3Error}</div>}
               </section>
 
               <section className={styles.panel}>
                 <div className={styles.panelHeader}>
                   <div>
-                    <p className={styles.eyebrow}>Tip-to-invest</p>
-                    <h2 className={styles.panelTitle}>M3 conversion preview</h2>
-                  </div>
-                  <a
-                    className={styles.textLink}
-                    href={`/api/tips?asset=${tipAsset}&amount=${tipAmount}&code=${referralSummary.code}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Tips API
-                  </a>
-                </div>
-
-                <div className={styles.toggleRow}>
-                  {tipOptions.map((option) => (
-                    <button
-                      key={option.asset}
-                      className={option.asset === tipAsset ? styles.segmentActive : styles.segment}
-                      onClick={() => setTipAsset(option.asset)}
-                    >
-                      {option.asset}
-                    </button>
-                  ))}
-                </div>
-
-                <label className={styles.field}>
-                  <span>Tip amount</span>
-                  <input
-                    className={styles.input}
-                    value={tipAmount}
-                    onChange={(event) => setTipAmount(event.target.value)}
-                    placeholder="25"
-                  />
-                </label>
-
-                <div className={styles.gridTwo}>
-                  <div className={styles.infoTile}>
-                    <span className={styles.infoLabel}>Routed deposit</span>
-                    <strong>{formatTipUsd(tipPreview.estimatedDepositUsd)}</strong>
-                    <p>{tipPreview.routeLabel}</p>
-                  </div>
-                  <div className={styles.infoTile}>
-                    <span className={styles.infoLabel}>Monthly yield</span>
-                    <strong>{formatTipUsd(tipPreview.projectedMonthlyYieldUsd)}</strong>
-                    <p>{tipPreview.destinationVault}</p>
+                    <p className={styles.eyebrow}>Protocol state</p>
+                    <h2 className={styles.panelTitle}>V3 adapter snapshot</h2>
                   </div>
                 </div>
 
-                <div className={styles.callout}>
-                  <strong>{tipPreview.actionLabel}</strong>
-                  <span>
-                    Fee drag {formatTipUsd(tipPreview.routingFeeUsd)}. {tipPreview.note}
-                  </span>
-                </div>
-
-                <div className={styles.dualActionRow}>
-                  <button className={styles.secondaryButton} onClick={trackTipIntent} disabled={tipTrackingBusy}>
-                    {tipTrackingBusy ? 'Tracking tip...' : 'Track tip intent'}
-                  </button>
-                  <span className={styles.metricFoot}>
-                    Intents tracked: {tipSummary?.totalIntents ?? 0} | Deposits tracked:{' '}
-                    {formatTipUsd(tipSummary?.totalProjectedDepositUsd ?? 0)}
-                  </span>
-                </div>
-              </section>
-            </div>
-
-            <div className={styles.gridTwoWide}>
-              <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.eyebrow}>Market pulse</p>
-                    <h2 className={styles.panelTitle}>Current snapshot</h2>
-                  </div>
-                  <a className={styles.textLink} href="/api/market" target="_blank" rel="noopener noreferrer">
-                    Market API
-                  </a>
-                </div>
-
-                <div className={styles.stackCompact}>
-                  {getMarketSnapshots().map((snapshot) => (
-                    <div key={snapshot.symbol} className={styles.listCard}>
-                      <div className={styles.listTop}>
-                        <strong>{snapshot.label}</strong>
-                        <span className={styles.inlineChip}>{snapshot.trend}</span>
-                      </div>
-                      <div className={styles.listMetrics}>
-                        <span>APY {formatMarketPercent(snapshot.currentApy)}</span>
-                        <span>7d {formatMarketDelta(snapshot.apyDelta7d)}</span>
-                        <span>TVL {formatMarketUsd(snapshot.tvlUsd)}</span>
-                      </div>
+                {protocolState ? (
+                  <div className={styles.gridTwo}>
+                    <div className={styles.infoTile}>
+                      <span className={styles.infoLabel}>Deposited</span>
+                      <strong>{formatTokenAmount(protocolState.totalDeposited)}</strong>
+                      <p>Underlying value: {formatTokenAmount(protocolState.totalUnderlyingValue)}</p>
                     </div>
-                  ))}
-                </div>
-              </section>
-
-              <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.eyebrow}>Learning path</p>
-                    <h2 className={styles.panelTitle}>Protocol education</h2>
-                  </div>
-                  <a
-                    className={styles.textLink}
-                    href={`/api/education?step=${activeLesson.step}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Lesson API
-                  </a>
-                </div>
-
-                <div className={styles.lessonCard}>
-                  <span className={styles.infoLabel}>
-                    Lesson {activeLesson.step} of {activeLesson.totalSteps}
-                  </span>
-                  <strong>{activeLesson.title}</strong>
-                  <p>{activeLesson.summary}</p>
-                  <ul className={styles.bulletList}>
-                    {activeLesson.bullets.map((bullet) => (
-                      <li key={bullet}>{bullet}</li>
-                    ))}
-                  </ul>
-                  <div className={styles.dualActionRow}>
-                    <button
-                      className={styles.secondaryButton}
-                      onClick={() => setLessonStep(getPreviousEducationStep(activeLesson.step))}
-                      disabled={activeLesson.step === 1}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      className={styles.primaryButton}
-                      onClick={() =>
-                        setLessonStep(
-                          activeLesson.step === activeLesson.totalSteps
-                            ? 1
-                            : getNextEducationStep(activeLesson.step),
-                        )
-                      }
-                    >
-                      {activeLesson.step === activeLesson.totalSteps ? 'Restart' : 'Next'}
-                    </button>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <div className={styles.gridTwoWide}>
-              <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.eyebrow}>Social layer</p>
-                    <h2 className={styles.panelTitle}>Leaderboard and referrals</h2>
-                  </div>
-                  <a
-                    className={styles.textLink}
-                    href={`/api/social?window=${leaderboardWindow}&privacy=${socialPrivacyMode}&compare=${
-                      socialComparisonEnabled ? 'on' : 'off'
-                    }&code=${referralSummary.code}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Social API
-                  </a>
-                </div>
-
-                <div className={styles.toggleRow}>
-                  {(['weekly', 'monthly'] as LeaderboardWindow[]).map((window) => (
-                    <button
-                      key={window}
-                      className={window === leaderboardWindow ? styles.segmentActive : styles.segment}
-                      onClick={() => setLeaderboardWindow(window)}
-                    >
-                      {window}
-                    </button>
-                  ))}
-                  <button
-                    className={socialComparisonEnabled ? styles.segmentActive : styles.segment}
-                    onClick={() => setSocialComparisonEnabled((value) => !value)}
-                  >
-                    {socialComparisonEnabled ? 'Compare on' : 'Compare off'}
-                  </button>
-                </div>
-
-                <div className={styles.toggleRow}>
-                  {(['public', 'anonymous'] as SocialPrivacyMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      className={mode === socialPrivacyMode ? styles.segmentActive : styles.segment}
-                      onClick={() => setSocialPrivacyMode(mode)}
-                    >
-                      {mode}
-                    </button>
-                  ))}
-                </div>
-
-                <div className={styles.stackCompact}>
-                  {socialPreview.leaderboard.map((entry) => (
-                    <div key={`${entry.rank}-${entry.displayName}`} className={styles.listCard}>
-                      <div className={styles.listTop}>
-                        <strong>
-                          #{entry.rank} {entry.displayName}
-                        </strong>
-                        <span className={styles.inlineChip}>score {entry.score}</span>
-                      </div>
-                      <div className={styles.listMetrics}>
-                        <span>{entry.handle}</span>
-                        <span>{formatSocialUsd(entry.capitalUsd)}</span>
-                        <span>{formatSocialPercent(entry.repaymentProgress)} repaid</span>
-                      </div>
+                    <div className={styles.infoTile}>
+                      <span className={styles.infoLabel}>Debt</span>
+                      <strong>{formatTokenAmount(protocolState.totalDebt)}</strong>
+                      <p>Deposit cap: {formatTokenAmount(protocolState.depositCap)}</p>
                     </div>
-                  ))}
-                </div>
-
-                <div className={styles.callout}>
-                  <strong>
-                    Referral {referralSummary.code} | {referralSummary.conversions}/{referralSummary.clicks}
-                  </strong>
-                  <span>
-                    {formatSocialPercent(referralSummary.conversionRate)} conversion rate,{' '}
-                    {formatSocialUsd(referralSummary.projectedRewardUsd)} projected rewards. {socialPreview.note}
-                  </span>
-                </div>
-
-                <div className={styles.dualActionRow}>
-                  <button
-                    className={styles.secondaryButton}
-                    onClick={() => trackReferralAction('click')}
-                    disabled={trackingBusy}
-                  >
-                    {trackingBusy ? 'Saving...' : 'Track click'}
-                  </button>
-                  <button
-                    className={styles.primaryButton}
-                    onClick={() => trackReferralAction('conversion')}
-                    disabled={trackingBusy}
-                  >
-                    {trackingBusy ? 'Saving...' : 'Track conversion'}
-                  </button>
-                </div>
-              </section>
-
-              <section className={styles.panel}>
-                <div className={styles.panelHeader}>
-                  <div>
-                    <p className={styles.eyebrow}>Automation</p>
-                    <h2 className={styles.panelTitle}>Bot and alert queue</h2>
                   </div>
-                  <a
-                    className={styles.textLink}
-                    href={`/api/bot?kind=${briefingKind}${
-                      briefingKind === 'health' ? `&health=${previewHealthState}` : ''
-                    }${briefingKind === 'milestone' ? `&progress=${milestoneProgress}` : ''}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Bot API
-                  </a>
-                </div>
-
-                <div className={styles.toggleRow}>
-                  {(['daily', 'health', 'milestone'] as BotBriefingKind[]).map((kind) => (
-                    <button
-                      key={kind}
-                      className={kind === briefingKind ? styles.segmentActive : styles.segment}
-                      onClick={() => setBriefingKind(kind)}
-                    >
-                      {kind}
-                    </button>
-                  ))}
-                </div>
-
-                {briefingKind === 'milestone' && (
-                  <div className={styles.toggleRow}>
-                    {[25, 50, 75, 100].map((value) => (
-                      <button
-                        key={value}
-                        className={value === milestoneProgress ? styles.segmentActive : styles.segment}
-                        onClick={() => setMilestoneProgress(value)}
-                      >
-                        {value}%
-                      </button>
-                    ))}
+                ) : (
+                  <div className={styles.callout}>
+                    {protocolLoading ? 'Loading protocol state...' : 'Protocol state unavailable.'}
                   </div>
                 )}
-
-                <div className={styles.lessonCard}>
-                  <span className={styles.infoLabel}>{activeBriefing.kind} scenario</span>
-                  <strong>{activeBriefing.headline}</strong>
-                  <p>{activeBriefing.summary}</p>
-                  <ul className={styles.bulletList}>
-                    {activeBriefing.lines.map((line) => (
-                      <li key={line}>{line}</li>
-                    ))}
-                  </ul>
-                  <div className={styles.calloutInline}>Suggested CTA: {activeBriefing.cta}</div>
-                </div>
               </section>
             </div>
+
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
+                <div>
+                  <p className={styles.eyebrow}>Navigation</p>
+                  <h2 className={styles.panelTitle}>Focused screens</h2>
+                </div>
+              </div>
+
+              <div className={styles.actionGrid}>
+                <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
+                  <span className={styles.actionEyebrow}>V3</span>
+                  <strong>Deposit</strong>
+                  <span>Open or add to a tokenId-backed position.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/v3">
+                  <span className={styles.actionEyebrow}>V3</span>
+                  <strong>Manage positions</strong>
+                  <span>Withdraw, borrow, repay, burn, or self-liquidate.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/analytics">
+                  <span className={styles.actionEyebrow}>Insights</span>
+                  <strong>Market and alerts</strong>
+                  <span>Review yield snapshots, health alerts, and bot briefings.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/learn">
+                  <span className={styles.actionEyebrow}>Guide</span>
+                  <strong>Learn Alchemix</strong>
+                  <span>Read the core V3 concepts without crowding the trading flow.</span>
+                </Link>
+                <Link className={styles.actionCard} href="/miniapp/social">
+                  <span className={styles.actionEyebrow}>Growth</span>
+                  <strong>Social tools</strong>
+                  <span>Manage referral and tip-intent previews away from core positions.</span>
+                </Link>
+              </div>
+            </section>
           </section>
         )}
       </div>

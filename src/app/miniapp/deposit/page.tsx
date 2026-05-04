@@ -1,6 +1,5 @@
 /**
- * Legacy V2 deposit page — redirects to V3 builder.
- * V2 is no longer supported; all deposits go through V3.
+ * Deposit shortcut — all deposits go through the V3 builder.
  */
 import { redirect } from 'next/navigation';
 

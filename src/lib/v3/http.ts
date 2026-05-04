@@ -86,7 +86,7 @@ export async function buildV3BorrowTransactionResponse(
 export async function buildV3RepayTransactionResponse(
   searchParams: URLSearchParams,
 ): Promise<TransactionResponse> {
-  const owner = parseV3Recipient(searchParams.get('owner'));
+  const owner = parseV3Recipient(searchParams.get('owner'), 'Owner');
   const amount = parseV3AmountInput(searchParams.get('amount'), 'Repay amount');
   const position = await getOwnedV3Position(owner, searchParams.get('tokenId'));
 
@@ -104,7 +104,7 @@ export async function buildV3RepayTransactionResponse(
 export async function buildV3BurnTransactionResponse(
   searchParams: URLSearchParams,
 ): Promise<TransactionResponse> {
-  const owner = parseV3Recipient(searchParams.get('owner'));
+  const owner = parseV3Recipient(searchParams.get('owner'), 'Owner');
   const amount = parseV3AmountInput(searchParams.get('amount'), 'Burn amount');
   const position = await getOwnedV3Position(owner, searchParams.get('tokenId'));
 
@@ -122,7 +122,7 @@ export async function buildV3BurnTransactionResponse(
 export async function buildV3SelfLiquidateTransactionResponse(
   searchParams: URLSearchParams,
 ): Promise<TransactionResponse> {
-  const owner = parseV3Recipient(searchParams.get('owner'));
+  const owner = parseV3Recipient(searchParams.get('owner'), 'Owner');
   const recipient = parseV3Recipient(searchParams.get('recipient') ?? searchParams.get('owner'), 'Recipient');
   const position = await getOwnedV3Position(owner, searchParams.get('tokenId'));
 

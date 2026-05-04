@@ -13,14 +13,15 @@ export function WalletButton() {
     return (
       <div style={{
         padding: '0.75rem 1.5rem',
-        backgroundColor: '#2a2a2a',
-        color: '#fff',
-        borderRadius: '0.75rem',
+        backgroundColor: 'var(--surface-raised)',
+        color: 'var(--ink)',
+        border: '1px solid var(--border)',
+        borderRadius: 8,
         fontWeight: 'bold',
         fontSize: '0.9rem',
         textAlign: 'center',
       }}>
-        🔐 Connecting...
+        Connecting...
       </div>
     );
   }
@@ -29,14 +30,15 @@ export function WalletButton() {
     return (
       <div style={{
         padding: '0.75rem 1.5rem',
-        backgroundColor: '#ff4444',
-        color: '#fff',
-        borderRadius: '0.75rem',
+        backgroundColor: 'rgba(248, 113, 113, 0.1)',
+        color: 'var(--danger)',
+        border: '1px solid rgba(248, 113, 113, 0.2)',
+        borderRadius: 8,
         fontWeight: 'bold',
         fontSize: '0.9rem',
         textAlign: 'center',
       }}>
-        ⚠️ Not in Farcaster
+        Not connected
       </div>
     );
   }
@@ -44,9 +46,10 @@ export function WalletButton() {
   return (
     <div style={{
       padding: '0.75rem 1.5rem',
-      background: 'linear-gradient(135deg, #4ade80 0%, #3b82f6 100%)',
-      color: '#fff',
-      borderRadius: '0.75rem',
+      background: 'var(--brand-muted)',
+      color: 'var(--brand-strong)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
       fontWeight: 'bold',
       fontSize: '0.9rem',
       textAlign: 'center',
@@ -55,7 +58,6 @@ export function WalletButton() {
       justifyContent: 'center',
       gap: '0.5rem',
     }}>
-      <span>🎭</span>
       <span style={{ fontFamily: 'monospace' }}>
         {address.slice(0, 6)}...{address.slice(-4)}
       </span>

@@ -4,13 +4,15 @@
 
 ## Status
 
-**V3 contracts are live and verified on Ethereum mainnet.**
+**V3 is the active integration target for CastAlchemy.** The current Alchemix
+docs describe V3 as the platform for MYT vaults, tokenId positions, alAssets,
+and Transmuter redemptions.
 
 | Contract | Address | Etherscan |
 |----------|---------|-----------|
-| VaultV2Factory | `0xdd56b00302e91c4c2b8246156bdeaa1cedc58984` | [Verified](https://etherscan.io/address/0xdd56b00302e91c4c2b8246156bdeaa1cedc58984) |
-| VaultV2 (USDC) | `0x9b44efca3e2a707b63dc00ce79d646e5e5d24ba5` | [Verified](https://etherscan.io/address/0x9b44efca3e2a707b63dc00ce79d646e5e5d24ba5) |
-| VaultV2 (WETH) | `0x29bcfed246ce37319d94eba107db90c453d4c43d` | [Verified, $6.2M+ TVL](https://etherscan.io/address/0x29bcfed246ce37319d94eba107db90c453d4c43d) |
+| Morpho Vault2 Factory | `0xdd56b00302e91c4c2b8246156bdeaa1cedc58984` | [Verified](https://etherscan.io/address/0xdd56b00302e91c4c2b8246156bdeaa1cedc58984) |
+| Mix USDC Vault2 | `0x9b44efca3e2a707b63dc00ce79d646e5e5d24ba5` | [Verified](https://etherscan.io/address/0x9b44efca3e2a707b63dc00ce79d646e5e5d24ba5) |
+| Mix WETH Vault2 | `0x29bcfed246ce37319d94eba107db90c453d4c43d` | [Verified, $6.2M+ TVL](https://etherscan.io/address/0x29bcfed246ce37319d94eba107db90c453d4c43d) |
 | AlchemistCurator | `0x7d61e3cde8b58c4be192a7a35e9d626c419302a4` | [Verified](https://etherscan.io/address/0x7d61e3cde8b58c4be192a7a35e9d626c419302a4) |
 | StrategyClassifier | `0xdb7d25b0bfd1585a797f6bf7d7ccba26e77253cc` | [Verified](https://etherscan.io/address/0xdb7d25b0bfd1585a797f6bf7d7ccba26e77253cc) |
 
@@ -24,13 +26,12 @@ Source: [alchemix-finance/v3](https://github.com/alchemix-finance/v3) broadcast 
 
 ```
 V3Adapter (interface)
-├── ContractV3Adapter  — live on-chain interaction via viem
-└── MockV3Adapter      — deterministic mock data for dev/preview
+└── ContractV3Adapter  — live on-chain interaction via viem
 ```
 
-Selection is controlled by `NEXT_PUBLIC_ALCHEMIX_V3_MODE`:
-- `mock` → `MockV3Adapter` (default, no RPC required)
-- `contracts` → `ContractV3Adapter` (requires configured RPC + addresses)
+The app always uses `ContractV3Adapter`. Position reads and calldata preparation
+require a configured RPC URL and non-zero addresses for the Alchemist, position
+NFT, transmuter, debt token, and underlying token.
 
 ### Key Files
 
@@ -38,8 +39,7 @@ Selection is controlled by `NEXT_PUBLIC_ALCHEMIX_V3_MODE`:
 |------|---------|
 | `src/lib/v3/abi.ts` | Official IAlchemistV3 ABI fragments (24 read + 8 write functions) |
 | `src/lib/v3/types.ts` | TypeScript interfaces for positions, protocol state, and transaction params |
-| `src/lib/v3/adapter.ts` | Adapter factory + `ContractV3Adapter` implementation |
-| `src/lib/v3/mock.ts` | `MockV3Adapter` with deterministic position data |
+| `src/lib/v3/adapter.ts` | `ContractV3Adapter` + singleton `getV3Adapter()` |
 | `src/lib/v3/config.ts` | Environment-driven config + known deployment addresses |
 | `src/lib/v3/hooks.ts` | React hooks: `useV3Positions`, `useV3Position` |
 | `src/lib/v3/server.ts` | Server-side helpers for Frog frame transaction prep |
@@ -100,14 +100,11 @@ Selection is controlled by `NEXT_PUBLIC_ALCHEMIX_V3_MODE`:
 # Feature flag
 NEXT_PUBLIC_ENABLE_ALCHEMIX_V3=true
 
-# Adapter mode
-NEXT_PUBLIC_ALCHEMIX_V3_MODE=contracts    # or "mock"
-
 # Chain config
 NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID=1
 NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL=https://eth.llamarpc.com
 
-# Contract addresses (must all be set for contracts mode)
+# Contract addresses (non-zero for Alchemist, position NFT, transmuter, debt, underlying)
 NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS=0x...
 NEXT_PUBLIC_ALCHEMIX_V3_POSITION_NFT_ADDRESS=0x...
 NEXT_PUBLIC_ALCHEMIX_V3_TRANSMUTER_ADDRESS=0x...
@@ -116,12 +113,14 @@ NEXT_PUBLIC_ALCHEMIX_V3_UNDERLYING_TOKEN_ADDRESS=0x...
 NEXT_PUBLIC_ALCHEMIX_V3_MYT_ADDRESS=0x...
 ```
 
-### Multi-Chain Support
+### Network Support
 
-The adapter supports any EVM chain. Known deployments are stored in `config.ts`:
-- **Chain 1** — Ethereum Mainnet (primary)
-- **Chain 42161** — Arbitrum (planned)
-- **Chain 10** — Optimism (planned)
+CastAlchemy intentionally supports only:
+- **Chain 1** — Ethereum Mainnet (production)
+- **Chain 11155111** — Sepolia (testing)
+
+Wallet transports, frame transaction payloads, and explorer links are constrained to
+these chains so unsupported L2 assumptions cannot leak into production flows.
 
 ---
 
@@ -145,7 +144,7 @@ Six action cards:
 
 ### Dynamic Elements
 
-- Chain-aware Etherscan links (mainnet/Arbitrum/Optimism/Sepolia)
+- Chain-aware Etherscan links (mainnet/Sepolia)
 - Network badge adapts to configured chain
 - Protocol state fetched on mount when V3 is enabled
 

@@ -1,6 +1,5 @@
 /**
- * Legacy V2 positions page — redirects to V3 builder.
- * V2 is no longer supported; all position management goes through V3.
+ * Positions shortcut — all position management goes through the V3 builder.
  */
 import { redirect } from 'next/navigation';
 

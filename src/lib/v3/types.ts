@@ -1,11 +1,9 @@
 import type { Address, Hex } from 'viem';
 
-export type V3AdapterMode = 'mock' | 'contracts';
 export type V3HealthState = 'safe' | 'watch' | 'danger';
 
 export interface V3ProtocolConfig {
   enabled: boolean;
-  mode: V3AdapterMode;
   chainId: number;
   rpcUrl: string | null;
   alchemistAddress: Address;
@@ -89,7 +87,7 @@ export interface PrepareSelfLiquidateParams {
 }
 
 export interface V3Adapter {
-  readonly mode: V3AdapterMode;
+  readonly mode: 'contracts';
   readonly config: V3ProtocolConfig;
   isReady(): boolean;
   getPositions(owner: Address): Promise<V3PositionSummary[]>;

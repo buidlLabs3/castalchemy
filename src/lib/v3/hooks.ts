@@ -35,7 +35,7 @@ export function useV3Positions(owner?: Address) {
     const adapter = getV3Adapter();
     if (!adapter.isReady()) {
       setPositions([]);
-      setError('Alchemix V3 contract mode is not configured yet.');
+      setError('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
       setIsLoading(false);
       return () => {
         cancelled = true;
@@ -100,7 +100,7 @@ export function useV3Position(tokenId?: bigint, owner?: Address) {
     const adapter = getV3Adapter();
     if (!adapter.isReady()) {
       setPosition(null);
-      setError('Alchemix V3 contract mode is not configured yet.');
+      setError('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
       setIsLoading(false);
       return () => {
         cancelled = true;
@@ -165,7 +165,7 @@ export function useV3ProtocolState() {
     const adapter = getV3Adapter();
     if (!adapter.isReady()) {
       setProtocolState(null);
-      setError('Alchemix V3 contract mode is not configured yet.');
+      setError('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
       setIsLoading(false);
       return () => {
         cancelled = true;

@@ -1,26 +1,26 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const ALCHEMIST_ADDRESS = '0x1111111111111111111111111111111111111111';
 const OWNER_ADDRESS = '0x0000000000000000000000000000000000000012';
 
 process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3 = 'true';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_MODE = 'mock';
 process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '11155111';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS = ALCHEMIST_ADDRESS;
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL = 'https://rpc.sepolia.org';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS = '0x1111111111111111111111111111111111111111';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_POSITION_NFT_ADDRESS = '0x2222222222222222222222222222222222222222';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_TRANSMUTER_ADDRESS = '0x3333333333333333333333333333333333333333';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_DEBT_TOKEN_ADDRESS = '0x4444444444444444444444444444444444444444';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_UNDERLYING_TOKEN_ADDRESS = '0x5555555555555555555555555555555555555555';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_MYT_ADDRESS = '0x6666666666666666666666666666666666666666';
 
 const configModule = await import('../src/lib/v3/config');
-const adapterModule = await import('../src/lib/v3/adapter');
 const serverModule = await import('../src/lib/v3/server');
 
 const { ZERO_ADDRESS } = configModule;
-const { resetV3AdapterForTests } = adapterModule;
 const {
   assertV3Borrowable,
   assertV3DebtAmount,
   assertV3Withdrawable,
-  getOwnedV3Position,
-  getServerV3Adapter,
   parseOptionalTokenId,
   parseRequiredTokenId,
   parseV3AmountInput,
@@ -51,24 +51,21 @@ test('token id parsing supports optional and required values', () => {
   assert.throws(() => parseOptionalTokenId('-1', 'Position'), /Position ID must be a valid non-negative integer/);
 });
 
-test('getOwnedV3Position returns a mock position for the configured owner', async () => {
-  resetV3AdapterForTests();
-  const adapter = getServerV3Adapter();
-  const positions = await adapter.getPositions(OWNER_ADDRESS);
-
-  assert.ok(positions.length >= 1);
-
-  const position = await getOwnedV3Position(OWNER_ADDRESS, positions[0].tokenId.toString());
-
-  assert.equal(position.owner, OWNER_ADDRESS);
-  assert.equal(position.tokenId, positions[0].tokenId);
-  assert.match(position.label, /^Position #/);
-});
-
-test('limit validators reject out-of-range values', async () => {
-  resetV3AdapterForTests();
-  const adapter = getServerV3Adapter();
-  const [position] = await adapter.getPositions(OWNER_ADDRESS);
+test('limit validators reject out-of-range values', () => {
+  const position = {
+    tokenId: 1n,
+    owner: OWNER_ADDRESS as `0x${string}`,
+    collateral: 10n ** 18n,
+    debt: 5n ** 17n,
+    earmarked: 0n,
+    collateralValue: 10n ** 18n,
+    maxBorrowable: 8n ** 17n,
+    maxWithdrawable: 4n ** 17n,
+    availableCredit: 3n ** 17n,
+    healthFactor: 2,
+    healthState: 'safe' as const,
+    lastUpdated: Date.now(),
+  };
 
   assert.doesNotThrow(() => assertV3Withdrawable(position, position.maxWithdrawable));
   assert.doesNotThrow(() => assertV3Borrowable(position, position.availableCredit));

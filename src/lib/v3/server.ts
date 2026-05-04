@@ -1,23 +1,10 @@
 import type { SendTransactionParameters, TransactionResponse } from 'frog';
 import { isAddress, parseEther, type Address } from 'viem';
 import { getV3Adapter } from './adapter';
+import { SUPPORTED_V3_CHAIN_IDS } from './config';
 import type { PreparedV3Transaction, V3Adapter, V3PositionDetail, V3PositionSummary } from './types';
 
-const SUPPORTED_FRAME_CHAIN_IDS = new Set<number>([
-  1,
-  10,
-  100,
-  137,
-  8453,
-  42161,
-  42170,
-  84532,
-  421614,
-  7777777,
-  11155111,
-  11155420,
-  666666666,
-]);
+const SUPPORTED_FRAME_CHAIN_IDS = new Set<number>(SUPPORTED_V3_CHAIN_IDS);
 
 function toFrameChainId(chainId: number): SendTransactionParameters['chainId'] {
   if (!SUPPORTED_FRAME_CHAIN_IDS.has(chainId)) {
@@ -35,7 +22,7 @@ export function getServerV3Adapter(): V3Adapter {
   }
 
   if (!adapter.isReady()) {
-    throw new Error('Alchemix V3 contract mode is not configured yet.');
+    throw new Error('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
   }
 
   return adapter;

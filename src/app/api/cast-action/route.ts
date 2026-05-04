@@ -73,11 +73,11 @@ export async function POST(request: Request) {
   const castHash = body.untrustedData?.castId?.hash ?? null;
   const castFid = body.untrustedData?.castId?.fid ?? null;
 
-  // Build a contextual yield summary from current market data
+  // Build a contextual yield summary from the configured market snapshot.
   const snapshots = getMarketSnapshots();
   const topVault = [...snapshots].sort((a, b) => b.currentApy - a.currentApy)[0];
 
-  const yieldLine = `${topVault.label} is yielding ${formatMarketPercent(topVault.currentApy)} APY`;
+  const yieldLine = `${topVault.label} snapshot shows ${formatMarketPercent(topVault.currentApy)} APY`;
 
   // Compose the miniapp link with optional cast context
   const miniappUrl = new URL(`${APP_URL}/miniapp`);

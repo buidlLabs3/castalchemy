@@ -30,7 +30,7 @@ import {
   assertV3Withdrawable,
   getOwnedV3Position,
   getServerV3Adapter,
-  getV3Adapter,
+  canUseContractV3,
   parseOptionalTokenId,
   parseV3AmountInput,
   parseV3Recipient,
@@ -386,12 +386,11 @@ async function handlePositionTransaction(c: TransactionContext, action: Position
 }
 
 app.frame('/frames', (c) => {
-  const adapter = getV3Adapter();
   const detail = !v3Config.enabled
     ? 'Enable the V3 feature flag to activate this flow.'
-    : adapter.mode === 'contracts' && !adapter.isReady()
-      ? 'Contract mode needs addresses and an RPC URL.'
-      : `Mode: ${adapter.mode}`;
+    : !canUseContractV3()
+      ? 'Set NEXT_PUBLIC_ALCHEMIX_V3_* contract addresses and RPC URL.'
+      : 'Live on-chain V3 adapter.';
 
   return c.res({
     image: renderCard('CastAlchemy V3', [

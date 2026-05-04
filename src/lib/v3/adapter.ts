@@ -7,7 +7,6 @@ import {
 } from 'viem';
 import { alchemistV3PositionNftAbi, alchemistV3ReadAbi, alchemistV3WriteAbi } from './abi';
 import { canUseContractV3, v3Config } from './config';
-import { MockV3Adapter } from './mock';
 import type {
   PrepareBurnParams,
   PrepareDepositParams,
@@ -57,7 +56,7 @@ class ContractV3Adapter implements V3Adapter {
 
   private assertReady() {
     if (!canUseContractV3()) {
-      throw new Error('Configure the NEXT_PUBLIC_ALCHEMIX_V3_* variables and RPC URL before enabling contract-backed V3 mode.');
+      throw new Error('Configure the NEXT_PUBLIC_ALCHEMIX_V3_* variables and RPC URL before calling the V3 adapter.');
     }
   }
 
@@ -343,7 +342,7 @@ let adapter: V3Adapter | null = null;
 
 export function getV3Adapter(): V3Adapter {
   if (!adapter) {
-    adapter = v3Config.mode === 'contracts' ? new ContractV3Adapter() : new MockV3Adapter();
+    adapter = new ContractV3Adapter();
   }
 
   return adapter;

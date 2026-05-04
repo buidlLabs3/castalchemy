@@ -9,13 +9,13 @@ export async function GET(request: Request) {
     return NextResponse.json({
       snapshot: getMarketSnapshot(symbol),
       timestamp: Date.now(),
-      source: 'provisional-preview',
+      source: 'configured-preview',
     });
   }
 
   return NextResponse.json({
     snapshots: getMarketSnapshots(),
     timestamp: Date.now(),
-    source: 'provisional-preview',
+    source: 'configured-preview',
   });
 }

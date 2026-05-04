@@ -5,20 +5,22 @@ import { useEffect, useState } from 'react';
 import { formatEther, parseEther } from 'viem';
 import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import styles from '../page.module.css';
-import { getV3Adapter, useV3Positions, useV3ProtocolState, v3Config, ZERO_ADDRESS } from '@/lib/v3';
+import {
+  canUseContractV3,
+  getV3Adapter,
+  getV3ChainMetadata,
+  useV3Positions,
+  useV3ProtocolState,
+  v3Config,
+  ZERO_ADDRESS,
+} from '@/lib/v3';
 import type { PreparedV3Transaction } from '@/lib/v3';
 import { useWallet } from '@/lib/wallet/hooks';
 
 type V3Action = 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'burn' | 'selfLiquidate';
 
-function getEtherscanBaseUrl(chainId: number): string {
-  switch (chainId) {
-    case 1: return 'https://etherscan.io';
-    case 10: return 'https://optimistic.etherscan.io';
-    case 42161: return 'https://arbiscan.io';
-    case 11155111: return 'https://sepolia.etherscan.io';
-    default: return 'https://etherscan.io';
-  }
+function getExplorerBaseUrl(chainId: number): string {
+  return getV3ChainMetadata(chainId).explorerUrl;
 }
 
 function formatTokenAmount(value: bigint): string {
@@ -45,6 +47,7 @@ function parseAmountInput(value: string): bigint | null {
 }
 
 export default function MiniAppV3Page() {
+  const chain = getV3ChainMetadata();
   const { address, isConnected, isConnecting, walletMode } = useWallet();
   const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address);
   const { sendTransaction, data: txHash, error: sendError, isPending: isSending } = useSendTransaction();
@@ -60,7 +63,6 @@ export default function MiniAppV3Page() {
   const [txLabel, setTxLabel] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
   const [isPreparing, setIsPreparing] = useState(false);
-  const [mockSubmissionId, setMockSubmissionId] = useState<string | null>(null);
   const [requestedAction, setRequestedAction] = useState<string | null>(null);
 
   const { protocolState } = useV3ProtocolState();
@@ -105,12 +107,10 @@ export default function MiniAppV3Page() {
     !!burnAmountValue &&
     burnAmountValue <= selectedPosition.debt;
 
+  const v3Live = canUseContractV3();
   const canSubmitPreparedTx =
-    walletMode === 'external' &&
-    !!preparedTx &&
-    v3Config.mode === 'contracts' &&
-    preparedTx.to !== ZERO_ADDRESS;
-  const canSimulatePreparedTx = !!preparedTx && v3Config.mode === 'mock';
+    walletMode === 'external' && !!preparedTx && v3Live && preparedTx.to !== ZERO_ADDRESS;
+  const modeLabel = v3Live ? 'Contracts' : 'Not configured';
 
   const walletSummary = isConnecting
     ? 'Checking...'
@@ -143,10 +143,6 @@ export default function MiniAppV3Page() {
     const nextAction = new URLSearchParams(window.location.search).get('action');
     setRequestedAction(nextAction);
   }, []);
-
-  useEffect(() => {
-    setMockSubmissionId(null);
-  }, [preparedTx]);
 
   const prepareTransaction = async (
     label: string,
@@ -385,15 +381,6 @@ export default function MiniAppV3Page() {
     });
   };
 
-  const handleSimulatePreparedTransaction = () => {
-    if (!preparedTx) {
-      return;
-    }
-
-    setTxError(null);
-    setMockSubmissionId(`mock-${Date.now().toString(36)}`);
-  };
-
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
@@ -402,7 +389,7 @@ export default function MiniAppV3Page() {
             <div>
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>Alchemix V3</span>
-                <span className={styles.networkBadge}>{getEtherscanBaseUrl(v3Config.chainId).includes('sepolia') ? 'Sepolia' : 'Mainnet'}</span>
+                <span className={styles.networkBadge}>{chain.shortLabel}</span>
               </div>
               <h1 className={styles.heroTitle}>Manage Positions</h1>
               <p className={styles.heroSubtitle}>
@@ -422,13 +409,15 @@ export default function MiniAppV3Page() {
           <div className={styles.metrics}>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Network</span>
-              <strong>{v3Config.chainId}</strong>
-              <span className={styles.metricFoot}>Target chain</span>
+              <strong>{chain.shortLabel}</strong>
+              <span className={styles.metricFoot}>{chain.label}</span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Mode</span>
-              <strong>{v3Config.mode}</strong>
-              <span className={styles.metricFoot}>{v3Config.mode === 'contracts' ? 'Live on-chain' : 'Mock mode'}</span>
+              <strong>{modeLabel}</strong>
+              <span className={styles.metricFoot}>
+                {v3Live ? 'Live on-chain' : 'Set contract addresses and NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL'}
+              </span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Positions</span>
@@ -515,7 +504,7 @@ export default function MiniAppV3Page() {
 
             {protocolState && (protocolState.depositsPaused || protocolState.loansPaused) && (
               <div className={styles.callout}>
-                <strong>⚠️ Protocol Alert</strong>
+                <strong>Protocol alert</strong>
                 <span>
                   {protocolState.depositsPaused && 'Deposits are currently paused by the protocol. '}
                   {protocolState.loansPaused && 'Loans/minting are currently paused by the protocol.'}
@@ -755,42 +744,26 @@ export default function MiniAppV3Page() {
 
                   <div className={styles.v3TxCard}>
                     <span className={styles.infoLabel}>Submit prepared transaction</span>
-                    {canSimulatePreparedTx ? (
-                      <button
-                        className={styles.secondaryButton}
-                        onClick={handleSimulatePreparedTransaction}
-                        disabled={!!mockSubmissionId}
-                      >
-                        {mockSubmissionId ? 'Mock submission complete' : 'Simulate submit in mock mode'}
-                      </button>
-                    ) : (
-                      <button
-                        className={styles.primaryButton}
-                        onClick={handleSendPreparedTransaction}
-                        disabled={!canSubmitPreparedTx || isSending || isConfirming}
-                      >
-                        {isSending
-                          ? 'Awaiting wallet confirmation...'
-                          : isConfirming
-                            ? 'Submitting transaction...'
-                            : isSuccess
-                              ? 'Transaction submitted'
-                              : 'Send with connected wallet'}
-                      </button>
+                    <button
+                      className={styles.primaryButton}
+                      onClick={handleSendPreparedTransaction}
+                      disabled={!canSubmitPreparedTx || isSending || isConfirming}
+                    >
+                      {isSending
+                        ? 'Awaiting wallet confirmation...'
+                        : isConfirming
+                          ? 'Submitting transaction...'
+                          : isSuccess
+                            ? 'Transaction submitted'
+                            : 'Send with connected wallet'}
+                    </button>
+
+                    {!v3Live && (
+                      <p>Configure all V3 contract addresses and an RPC URL to prepare valid calldata.</p>
                     )}
 
-                    {canSimulatePreparedTx && (
-                      <p>
-                        Mock mode does not send real transactions. This simulates the final step so
-                        you can validate UI flow.
-                      </p>
-                    )}
-
-                    {!canSimulatePreparedTx && !canSubmitPreparedTx && (
-                      <p>
-                        External wallet mode plus contract-backed V3 config is required for live
-                        transaction signing.
-                      </p>
+                    {v3Live && !canSubmitPreparedTx && (
+                      <p>Connect with an external wallet (browser extension) to sign and broadcast this transaction.</p>
                     )}
 
                     {sendError && <div className={styles.callout}>{sendError.message}</div>}
@@ -800,7 +773,7 @@ export default function MiniAppV3Page() {
                         <span className={styles.infoLabel}>Transaction hash</span>
                         <span className={styles.v3Mono}>{txHash}</span>
                         <a
-                          href={`${getEtherscanBaseUrl(v3Config.chainId)}/tx/${txHash}`}
+                          href={`${getExplorerBaseUrl(v3Config.chainId)}/tx/${txHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={styles.textLink}
@@ -810,12 +783,6 @@ export default function MiniAppV3Page() {
                       </div>
                     )}
 
-                    {mockSubmissionId && (
-                      <div className={styles.v3Kv}>
-                        <span className={styles.infoLabel}>Mock submission ID</span>
-                        <span className={styles.v3Mono}>{mockSubmissionId}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}

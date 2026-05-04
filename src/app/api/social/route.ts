@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       tipIntents: tipSummary.totalIntents,
     },
     timestamp: Date.now(),
-    source: 'provisional-preview+tracking',
+    source: 'growth-preview+memory-tracking',
   });
 }
 
@@ -88,6 +88,6 @@ export async function POST(request: Request) {
       tipIntents: tipSummary.totalIntents,
     },
     timestamp: Date.now(),
-    source: 'provisional-preview+tracking',
+    source: 'growth-preview+memory-tracking',
   });
 }

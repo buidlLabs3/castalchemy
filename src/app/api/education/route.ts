@@ -9,13 +9,13 @@ export async function GET(request: Request) {
     return NextResponse.json({
       lesson: getEducationLesson(step),
       timestamp: Date.now(),
-      source: 'provisional-preview',
+      source: 'curated-v3-guide',
     });
   }
 
   return NextResponse.json({
     lessons: getEducationLessons(),
     timestamp: Date.now(),
-    source: 'provisional-preview',
+    source: 'curated-v3-guide',
   });
 }

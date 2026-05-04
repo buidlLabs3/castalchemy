@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     summary,
     referral: getReferralMetrics(referralCode),
     timestamp: Date.now(),
-    source: 'provisional-preview+tracking',
+    source: 'growth-preview+memory-tracking',
   });
 }
 
@@ -62,6 +62,6 @@ export async function POST(request: Request) {
     summary: getTipTrackingSummary(8),
     referral,
     timestamp: Date.now(),
-    source: 'provisional-preview+tracking',
+    source: 'growth-preview+memory-tracking',
   });
 }

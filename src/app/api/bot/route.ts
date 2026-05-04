@@ -15,6 +15,6 @@ export async function GET(request: Request) {
       progress: Number.isFinite(progressParam) ? progressParam : 50,
     }),
     timestamp: Date.now(),
-    source: 'provisional-preview',
+    source: 'configured-automation-preview',
   });
 }
