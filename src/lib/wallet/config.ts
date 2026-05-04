@@ -25,7 +25,7 @@ export const config = createConfig({
       retryCount: 3,
       retryDelay: 1000,
     }),
-    [sepolia.id]: http('https://rpc.sepolia.org', {
+    [sepolia.id]: http(process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org', {
       batch: true,
       retryCount: 3,
       retryDelay: 1000,
