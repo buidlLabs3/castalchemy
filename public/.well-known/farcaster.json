@@ -7,25 +7,34 @@
   "miniapp": {
     "version": "1",
     "name": "CastAlchemy",
-    "iconUrl": "https://via.placeholder.com/200x200/1a1a1a/ffffff?text=CA",
-    "splashImageUrl": "https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy",
+    "iconUrl": "https://castalchemy.vercel.app/api/miniapp-icon",
+    "splashImageUrl": "https://castalchemy.vercel.app/api/miniapp-splash",
     "splashBackgroundColor": "#0a0a0a",
     "homeUrl": "https://castalchemy.vercel.app/miniapp",
     "webhookUrl": "https://castalchemy.vercel.app/api/frames",
+    "imageUrl": "https://castalchemy.vercel.app/api/miniapp-image",
+    "buttonTitle": "Open CastAlchemy",
     "subtitle": "Alchemix on Farcaster",
     "description": "Manage Alchemix V3 positions from Farcaster.",
     "primaryCategory": "finance",
+    "heroImageUrl": "https://castalchemy.vercel.app/api/miniapp-image",
+    "ogTitle": "CastAlchemy",
+    "ogDescription": "Alchemix V3 on Farcaster.",
+    "ogImageUrl": "https://castalchemy.vercel.app/api/miniapp-image",
     "tags": ["alchemix", "defi", "ethereum", "sepolia", "wallet"],
     "requiredChains": ["eip155:1", "eip155:11155111"],
-    "requiredCapabilities": ["wallet.getEthereumProvider"]
+    "requiredCapabilities": ["wallet.getEthereumProvider"],
+    "canonicalDomain": "castalchemy.vercel.app"
   },
   "frame": {
     "version": "1",
     "name": "CastAlchemy",
-    "iconUrl": "https://via.placeholder.com/200x200/1a1a1a/ffffff?text=CA",
-    "splashImageUrl": "https://via.placeholder.com/600x400/1a1a1a/ffffff?text=CastAlchemy",
+    "iconUrl": "https://castalchemy.vercel.app/api/miniapp-icon",
+    "splashImageUrl": "https://castalchemy.vercel.app/api/miniapp-splash",
     "splashBackgroundColor": "#0a0a0a",
     "homeUrl": "https://castalchemy.vercel.app/miniapp",
+    "imageUrl": "https://castalchemy.vercel.app/api/miniapp-image",
+    "buttonTitle": "Open CastAlchemy",
     "webhookUrl": "https://castalchemy.vercel.app/api/frames"
   }
 }

@@ -8,11 +8,10 @@
  */
 
 import { NextResponse } from 'next/server';
+import { getPublicAppUrl } from '@/lib/config/app';
 import { getMarketSnapshots, formatMarketPercent } from '@/lib/market/snapshots';
 
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://castalchemy.vercel.app');
+const APP_URL = getPublicAppUrl();
 
 /**
  * GET /api/cast-action

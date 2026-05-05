@@ -1,21 +1,22 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+import { getPublicAppUrl } from '@/lib/config/app';
 
-const appUrl =
-  process.env.NEXT_PUBLIC_APP_URL ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://castalchemy.vercel.app');
+const appUrl = getPublicAppUrl();
+const embedImageUrl = `${appUrl}/api/miniapp-image`;
+const splashImageUrl = `${appUrl}/api/miniapp-splash`;
 
 const miniAppEmbed = JSON.stringify({
   version: '1',
-  imageUrl: `${appUrl}/frame-cover.svg`,
+  imageUrl: embedImageUrl,
   button: {
     title: 'Open CastAlchemy',
     action: {
       type: 'launch_miniapp',
       name: 'CastAlchemy',
       url: `${appUrl}/miniapp`,
-      splashImageUrl: `${appUrl}/frame-cover.svg`,
+      splashImageUrl,
       splashBackgroundColor: '#0a0a0a',
     },
   },
@@ -23,14 +24,14 @@ const miniAppEmbed = JSON.stringify({
 
 const legacyFrameEmbed = JSON.stringify({
   version: '1',
-  imageUrl: `${appUrl}/frame-cover.svg`,
+  imageUrl: embedImageUrl,
   button: {
     title: 'Open CastAlchemy',
     action: {
       type: 'launch_frame',
       name: 'CastAlchemy',
       url: `${appUrl}/miniapp`,
-      splashImageUrl: `${appUrl}/frame-cover.svg`,
+      splashImageUrl,
       splashBackgroundColor: '#0a0a0a',
     },
   },
@@ -44,11 +45,6 @@ export const metadata: Metadata = {
     'fc:miniapp': miniAppEmbed,
     // Legacy fallback for clients that still read fc:frame tags.
     'fc:frame': legacyFrameEmbed,
-    'fc:frame:image': `${appUrl}/frame-cover.svg`,
-    'fc:frame:image:aspect_ratio': '1.91:1',
-    'fc:frame:button:1': 'Open CastAlchemy',
-    'fc:frame:button:1:action': 'link',
-    'fc:frame:button:1:target': `${appUrl}/miniapp`,
   },
 };
 
