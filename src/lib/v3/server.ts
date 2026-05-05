@@ -1,7 +1,7 @@
 import type { SendTransactionParameters, TransactionResponse } from 'frog';
 import { isAddress, parseEther, type Address } from 'viem';
 import { getV3Adapter } from './adapter';
-import { SUPPORTED_V3_CHAIN_IDS } from './config';
+import { isSupportedV3ChainId, SUPPORTED_V3_CHAIN_IDS, v3Config } from './config';
 import type { PreparedV3Transaction, V3Adapter, V3PositionDetail, V3PositionSummary } from './types';
 
 const SUPPORTED_FRAME_CHAIN_IDS = new Set<number>(SUPPORTED_V3_CHAIN_IDS);
@@ -14,8 +14,22 @@ function toFrameChainId(chainId: number): SendTransactionParameters['chainId'] {
   return `eip155:${chainId}` as SendTransactionParameters['chainId'];
 }
 
-export function getServerV3Adapter(): V3Adapter {
-  const adapter = getV3Adapter();
+export function parseV3ChainId(value: string | null | undefined): number {
+  if (!value) {
+    return v3Config.chainId;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || !isSupportedV3ChainId(parsed)) {
+    throw new Error('Chain must be Ethereum mainnet or Sepolia.');
+  }
+
+  return parsed;
+}
+
+export function getServerV3Adapter(chainId: number = v3Config.chainId): V3Adapter {
+  const adapter = getV3Adapter(chainId);
 
   if (!adapter.config.enabled) {
     throw new Error('Alchemix V3 is currently disabled.');
@@ -92,9 +106,10 @@ export async function getOwnedV3Position(
   owner: Address,
   tokenIdValue: string | null | undefined,
   label = 'Position',
+  chainId: number = v3Config.chainId,
 ): Promise<V3PositionDetail> {
   const tokenId = parseRequiredTokenId(tokenIdValue, label);
-  const adapter = getServerV3Adapter();
+  const adapter = getServerV3Adapter(chainId);
   const position = await adapter.getPosition(tokenId, owner);
 
   if (!position) {

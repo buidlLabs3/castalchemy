@@ -6,7 +6,7 @@ import {
   type Chain,
 } from 'viem';
 import { alchemistV3PositionNftAbi, alchemistV3ReadAbi, alchemistV3WriteAbi } from './abi';
-import { canUseContractV3, v3Config } from './config';
+import { canUseContractV3, getV3Config, v3Config } from './config';
 import type {
   PrepareBurnParams,
   PrepareDepositParams,
@@ -16,6 +16,7 @@ import type {
   PrepareWithdrawParams,
   PreparedV3Transaction,
   V3Adapter,
+  V3ProtocolConfig,
   V3PositionDetail,
   V3PositionSummary,
   V3ProtocolState,
@@ -50,13 +51,17 @@ function calculateHealthFactor(collateralValue: bigint, debt: bigint): number {
 class ContractV3Adapter implements V3Adapter {
   readonly mode = 'contracts' as const;
 
-  readonly config = v3Config;
+  readonly config: V3ProtocolConfig;
+
+  constructor(config: V3ProtocolConfig = v3Config) {
+    this.config = config;
+  }
 
   private publicClient: ReturnType<typeof createPublicClient> | null = null;
 
   private assertReady() {
-    if (!canUseContractV3()) {
-      throw new Error('Configure the NEXT_PUBLIC_ALCHEMIX_V3_* variables and RPC URL before calling the V3 adapter.');
+    if (!canUseContractV3(this.config.chainId)) {
+      throw new Error(`Configure the Alchemix V3 variables and RPC URL for chain ${this.config.chainId} before calling the V3 adapter.`);
     }
   }
 
@@ -65,7 +70,7 @@ class ContractV3Adapter implements V3Adapter {
 
     if (!this.publicClient) {
       const chain = {
-        id: v3Config.chainId,
+        id: this.config.chainId,
         name: 'Alchemix V3',
         network: 'alchemix-v3',
         nativeCurrency: {
@@ -74,14 +79,14 @@ class ContractV3Adapter implements V3Adapter {
           decimals: 18,
         },
         rpcUrls: {
-          default: { http: [v3Config.rpcUrl as string] },
-          public: { http: [v3Config.rpcUrl as string] },
+          default: { http: [this.config.rpcUrl as string] },
+          public: { http: [this.config.rpcUrl as string] },
         },
       } as Chain;
 
       this.publicClient = createPublicClient({
         chain,
-        transport: http(v3Config.rpcUrl as string),
+        transport: http(this.config.rpcUrl as string),
       });
     }
 
@@ -93,32 +98,32 @@ class ContractV3Adapter implements V3Adapter {
     const resolvedOwner =
       owner ??
       (await client.readContract({
-        address: v3Config.positionNftAddress,
+        address: this.config.positionNftAddress,
         abi: alchemistV3PositionNftAbi,
         functionName: 'ownerOf',
         args: [tokenId],
       }));
     const [collateral, debt, earmarked] = (await client.readContract({
-      address: v3Config.alchemistAddress,
+      address: this.config.alchemistAddress,
       abi: alchemistV3ReadAbi,
       functionName: 'getCDP',
       args: [tokenId],
     })) as [bigint, bigint, bigint];
     const [collateralValue, maxBorrowable, maxWithdrawable] = await Promise.all([
       client.readContract({
-        address: v3Config.alchemistAddress,
+        address: this.config.alchemistAddress,
         abi: alchemistV3ReadAbi,
         functionName: 'totalValue',
         args: [tokenId],
       }),
       client.readContract({
-        address: v3Config.alchemistAddress,
+        address: this.config.alchemistAddress,
         abi: alchemistV3ReadAbi,
         functionName: 'getMaxBorrowable',
         args: [tokenId],
       }),
       client.readContract({
-        address: v3Config.alchemistAddress,
+        address: this.config.alchemistAddress,
         abi: alchemistV3ReadAbi,
         functionName: 'getMaxWithdrawable',
         args: [tokenId],
@@ -145,14 +150,14 @@ class ContractV3Adapter implements V3Adapter {
   }
 
   isReady(): boolean {
-    return canUseContractV3();
+    return canUseContractV3(this.config.chainId);
   }
 
   async getPositions(owner: Address): Promise<V3PositionSummary[]> {
     this.assertReady();
     const client = this.getPublicClient();
     const balance = await client.readContract({
-      address: v3Config.positionNftAddress,
+      address: this.config.positionNftAddress,
       abi: alchemistV3PositionNftAbi,
       functionName: 'balanceOf',
       args: [owner],
@@ -166,7 +171,7 @@ class ContractV3Adapter implements V3Adapter {
     const tokenIds = await Promise.all(
       Array.from({ length: count }, (_, index) =>
         client.readContract({
-          address: v3Config.positionNftAddress,
+          address: this.config.positionNftAddress,
           abi: alchemistV3PositionNftAbi,
           functionName: 'tokenOfOwnerByIndex',
           args: [owner, BigInt(index)],
@@ -210,14 +215,14 @@ class ContractV3Adapter implements V3Adapter {
       totalDeposited,
       totalUnderlyingValue,
     ] = await Promise.all([
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'depositsPaused' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'loansPaused' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'minimumCollateralization' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'globalMinimumCollateralization' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'depositCap' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'totalDebt' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'getTotalDeposited' }),
-      client.readContract({ address: v3Config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'getTotalUnderlyingValue' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'depositsPaused' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'loansPaused' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'minimumCollateralization' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'globalMinimumCollateralization' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'depositCap' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'totalDebt' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'getTotalDeposited' }),
+      client.readContract({ address: this.config.alchemistAddress, abi: alchemistV3ReadAbi, functionName: 'getTotalUnderlyingValue' }),
     ]);
 
     return {
@@ -239,8 +244,8 @@ class ContractV3Adapter implements V3Adapter {
     }
 
     return {
-      chainId: v3Config.chainId,
-      to: v3Config.alchemistAddress,
+      chainId: this.config.chainId,
+      to: this.config.alchemistAddress,
       data: encodeFunctionData({
         abi: alchemistV3WriteAbi,
         functionName: 'deposit',
@@ -257,8 +262,8 @@ class ContractV3Adapter implements V3Adapter {
     }
 
     return {
-      chainId: v3Config.chainId,
-      to: v3Config.alchemistAddress,
+      chainId: this.config.chainId,
+      to: this.config.alchemistAddress,
       data: encodeFunctionData({
         abi: alchemistV3WriteAbi,
         functionName: 'withdraw',
@@ -275,8 +280,8 @@ class ContractV3Adapter implements V3Adapter {
     }
 
     return {
-      chainId: v3Config.chainId,
-      to: v3Config.alchemistAddress,
+      chainId: this.config.chainId,
+      to: this.config.alchemistAddress,
       data: encodeFunctionData({
         abi: alchemistV3WriteAbi,
         functionName: 'mint',
@@ -293,8 +298,8 @@ class ContractV3Adapter implements V3Adapter {
     }
 
     return {
-      chainId: v3Config.chainId,
-      to: v3Config.alchemistAddress,
+      chainId: this.config.chainId,
+      to: this.config.alchemistAddress,
       data: encodeFunctionData({
         abi: alchemistV3WriteAbi,
         functionName: 'burn',
@@ -311,8 +316,8 @@ class ContractV3Adapter implements V3Adapter {
     }
 
     return {
-      chainId: v3Config.chainId,
-      to: v3Config.alchemistAddress,
+      chainId: this.config.chainId,
+      to: this.config.alchemistAddress,
       data: encodeFunctionData({
         abi: alchemistV3WriteAbi,
         functionName: 'repay',
@@ -326,8 +331,8 @@ class ContractV3Adapter implements V3Adapter {
     this.assertReady();
 
     return {
-      chainId: v3Config.chainId,
-      to: v3Config.alchemistAddress,
+      chainId: this.config.chainId,
+      to: this.config.alchemistAddress,
       data: encodeFunctionData({
         abi: alchemistV3WriteAbi,
         functionName: 'selfLiquidate',
@@ -338,16 +343,20 @@ class ContractV3Adapter implements V3Adapter {
   }
 }
 
-let adapter: V3Adapter | null = null;
+const adapters = new Map<number, V3Adapter>();
 
-export function getV3Adapter(): V3Adapter {
+export function getV3Adapter(chainId: number = v3Config.chainId): V3Adapter {
+  const config = getV3Config(chainId);
+  let adapter = adapters.get(config.chainId);
+
   if (!adapter) {
-    adapter = new ContractV3Adapter();
+    adapter = new ContractV3Adapter(config);
+    adapters.set(config.chainId, adapter);
   }
 
   return adapter;
 }
 
 export function resetV3AdapterForTests() {
-  adapter = null;
+  adapters.clear();
 }

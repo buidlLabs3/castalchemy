@@ -20,16 +20,25 @@ export const config = createConfig({
     walletConnect({ projectId }),
   ],
   transports: {
-    [mainnet.id]: http(process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL || 'https://eth.llamarpc.com', {
-      batch: true,
-      retryCount: 3,
-      retryDelay: 1000,
-    }),
-    [sepolia.id]: http(process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org', {
-      batch: true,
-      retryCount: 3,
-      retryDelay: 1000,
-    }),
+    [mainnet.id]: http(
+      process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_RPC_URL ||
+        process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL ||
+        process.env.ETHEREUM_RPC_URL ||
+        'https://eth.llamarpc.com',
+      {
+        batch: true,
+        retryCount: 3,
+        retryDelay: 1000,
+      },
+    ),
+    [sepolia.id]: http(
+      process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
+      {
+        batch: true,
+        retryCount: 3,
+        retryDelay: 1000,
+      },
+    ),
   },
 });
 

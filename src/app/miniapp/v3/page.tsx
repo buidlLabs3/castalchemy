@@ -9,9 +9,10 @@ import {
   canUseContractV3,
   getV3Adapter,
   getV3ChainMetadata,
+  SUPPORTED_V3_CHAIN_IDS,
+  useSelectedV3ChainId,
   useV3Positions,
   useV3ProtocolState,
-  v3Config,
   ZERO_ADDRESS,
 } from '@/lib/v3';
 import type { PreparedV3Transaction } from '@/lib/v3';
@@ -47,9 +48,10 @@ function parseAmountInput(value: string): bigint | null {
 }
 
 export default function MiniAppV3Page() {
-  const chain = getV3ChainMetadata();
+  const { selectedChainId, setSelectedChainId } = useSelectedV3ChainId();
+  const chain = getV3ChainMetadata(selectedChainId);
   const { address, isConnected, isConnecting, walletMode } = useWallet();
-  const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address);
+  const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address, selectedChainId);
   const { sendTransaction, data: txHash, error: sendError, isPending: isSending } = useSendTransaction();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
@@ -65,7 +67,7 @@ export default function MiniAppV3Page() {
   const [isPreparing, setIsPreparing] = useState(false);
   const [requestedAction, setRequestedAction] = useState<string | null>(null);
 
-  const { protocolState } = useV3ProtocolState();
+  const { protocolState } = useV3ProtocolState(selectedChainId);
 
   const preferredAction: V3Action =
     requestedAction === 'withdraw' ||
@@ -107,7 +109,7 @@ export default function MiniAppV3Page() {
     !!burnAmountValue &&
     burnAmountValue <= selectedPosition.debt;
 
-  const v3Live = canUseContractV3();
+  const v3Live = canUseContractV3(selectedChainId);
   const canSubmitPreparedTx =
     walletMode === 'external' && !!preparedTx && v3Live && preparedTx.to !== ZERO_ADDRESS;
   const modeLabel = v3Live ? 'Contracts' : 'Not configured';
@@ -179,7 +181,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       'Deposit (new position)',
       async () => {
-        const adapter = getV3Adapter();
+        const adapter = getV3Adapter(selectedChainId);
         return adapter.prepareDeposit({
           amount: depositAmountValue,
           recipient: address,
@@ -219,7 +221,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Withdraw from position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter();
+        const adapter = getV3Adapter(selectedChainId);
         return adapter.prepareWithdraw({
           tokenId: BigInt(selectedTokenId),
           amount: withdrawAmountValue,
@@ -259,7 +261,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Borrow from position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter();
+        const adapter = getV3Adapter(selectedChainId);
         return adapter.prepareMint({
           tokenId: BigInt(selectedTokenId),
           amount: borrowAmountValue,
@@ -294,7 +296,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Repay for position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter();
+        const adapter = getV3Adapter(selectedChainId);
         return adapter.prepareRepay({
           amount: repayAmountValue,
           recipientTokenId: BigInt(selectedTokenId),
@@ -328,7 +330,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Burn against position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter();
+        const adapter = getV3Adapter(selectedChainId);
         return adapter.prepareBurn({
           amount: burnAmountValue,
           recipientTokenId: BigInt(selectedTokenId),
@@ -357,7 +359,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Self-liquidate position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter();
+        const adapter = getV3Adapter(selectedChainId);
         return adapter.prepareSelfLiquidate({
           accountId: BigInt(selectedTokenId),
           recipient: address,
@@ -375,6 +377,7 @@ export default function MiniAppV3Page() {
     setTxError(null);
 
     sendTransaction({
+      chainId: preparedTx.chainId,
       to: preparedTx.to,
       data: preparedTx.data,
       value: preparedTx.value,
@@ -400,6 +403,24 @@ export default function MiniAppV3Page() {
             <div className={styles.heroWallet}>
               <span className={styles.walletLabel}>Wallet</span>
               <strong>{walletSummary}</strong>
+              <label className={styles.field}>
+                <span>Network</span>
+                <select
+                  value={selectedChainId}
+                  onChange={(event) => setSelectedChainId(event.target.value)}
+                  className={styles.input}
+                >
+                  {SUPPORTED_V3_CHAIN_IDS.map((chainId) => {
+                    const option = getV3ChainMetadata(chainId);
+
+                    return (
+                      <option key={chainId} value={chainId}>
+                        {option.shortLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
               <Link href="/miniapp" className={styles.secondaryButton}>
                 Dashboard
               </Link>
@@ -416,7 +437,7 @@ export default function MiniAppV3Page() {
               <span className={styles.metricLabel}>Mode</span>
               <strong>{modeLabel}</strong>
               <span className={styles.metricFoot}>
-                {v3Live ? 'Live on-chain' : 'Set contract addresses and NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL'}
+                {v3Live ? 'Live on-chain' : `Set ${chain.shortLabel} contract addresses and RPC URL`}
               </span>
             </div>
             <div className={styles.metricCard}>
@@ -773,7 +794,7 @@ export default function MiniAppV3Page() {
                         <span className={styles.infoLabel}>Transaction hash</span>
                         <span className={styles.v3Mono}>{txHash}</span>
                         <a
-                          href={`${getExplorerBaseUrl(v3Config.chainId)}/tx/${txHash}`}
+                          href={`${getExplorerBaseUrl(preparedTx.chainId)}/tx/${txHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={styles.textLink}

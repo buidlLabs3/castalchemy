@@ -5,7 +5,14 @@ import { useEffect, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { formatEther, type Address } from 'viem';
 import styles from './page.module.css';
-import { canUseContractV3, getV3ChainMetadata, useV3Positions, useV3ProtocolState } from '@/lib/v3';
+import {
+  canUseContractV3,
+  getV3ChainMetadata,
+  SUPPORTED_V3_CHAIN_IDS,
+  useSelectedV3ChainId,
+  useV3Positions,
+  useV3ProtocolState,
+} from '@/lib/v3';
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useWallet } from '@/lib/wallet/hooks';
 
@@ -31,7 +38,8 @@ export default function MiniApp() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
 
-  const chain = getV3ChainMetadata();
+  const { selectedChainId, setSelectedChainId } = useSelectedV3ChainId();
+  const chain = getV3ChainMetadata(selectedChainId);
   const {
     address,
     isConnected,
@@ -47,13 +55,13 @@ export default function MiniApp() {
     isLoading: positionsLoading,
     error: positionsError,
     reload: reloadPositions,
-  } = useV3Positions(address);
+  } = useV3Positions(address, selectedChainId);
   const {
     protocolState,
     isLoading: protocolLoading,
     error: protocolError,
     reload: reloadProtocol,
-  } = useV3ProtocolState();
+  } = useV3ProtocolState(selectedChainId);
 
   const primaryPosition = positions[0] ?? null;
   const protocolPaused = !!protocolState && (protocolState.depositsPaused || protocolState.loansPaused);
@@ -142,7 +150,7 @@ export default function MiniApp() {
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>CastAlchemy</span>
                 <span className={styles.networkBadge}>{chain.shortLabel}</span>
-                <span className={styles.networkBadge}>{canUseContractV3() ? 'Live V3' : 'V3 not configured'}</span>
+                <span className={styles.networkBadge}>{canUseContractV3(selectedChainId) ? 'Live V3' : 'V3 not configured'}</span>
               </div>
               <h1 className={styles.heroTitle}>Alchemix V3 from Farcaster</h1>
               <p className={styles.heroSubtitle}>
@@ -160,6 +168,24 @@ export default function MiniApp() {
                     ? 'External wallet'
                     : 'No wallet selected'}
               </span>
+              <label className={styles.field}>
+                <span>Network</span>
+                <select
+                  value={selectedChainId}
+                  onChange={(event) => setSelectedChainId(event.target.value)}
+                  className={styles.input}
+                >
+                  {SUPPORTED_V3_CHAIN_IDS.map((chainId) => {
+                    const option = getV3ChainMetadata(chainId);
+
+                    return (
+                      <option key={chainId} value={chainId}>
+                        {option.shortLabel}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
             </div>
           </div>
 

@@ -92,32 +92,130 @@ function isConfiguredAddress(value: Address): boolean {
   return value !== ZERO_ADDRESS;
 }
 
-const alchemistAddress = readAddress(process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS);
-const positionNftAddress = readAddress(process.env.NEXT_PUBLIC_ALCHEMIX_V3_POSITION_NFT_ADDRESS);
-const transmuterAddress = readAddress(process.env.NEXT_PUBLIC_ALCHEMIX_V3_TRANSMUTER_ADDRESS);
-const debtTokenAddress = readAddress(process.env.NEXT_PUBLIC_ALCHEMIX_V3_DEBT_TOKEN_ADDRESS);
-const underlyingTokenAddress = readAddress(process.env.NEXT_PUBLIC_ALCHEMIX_V3_UNDERLYING_TOKEN_ADDRESS);
-const mytAddress = readAddress(process.env.NEXT_PUBLIC_ALCHEMIX_V3_MYT_ADDRESS);
+type V3ChainEnvKey =
+  | 'RPC_URL'
+  | 'ALCHEMIST_ADDRESS'
+  | 'POSITION_NFT_ADDRESS'
+  | 'TRANSMUTER_ADDRESS'
+  | 'DEBT_TOKEN_ADDRESS'
+  | 'UNDERLYING_TOKEN_ADDRESS'
+  | 'MYT_ADDRESS';
 
-export const v3Config: V3ProtocolConfig = {
-  enabled: readBoolean(process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3),
-  chainId: readSupportedChainId(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID),
-  rpcUrl: process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL || null,
-  alchemistAddress,
-  positionNftAddress,
-  transmuterAddress,
-  debtTokenAddress,
-  underlyingTokenAddress,
-  mytAddress,
-  isConfigured: [
+function readChainEnv(chainId: SupportedV3ChainId, key: V3ChainEnvKey): string | undefined {
+  if (chainId === V3_MAINNET_CHAIN_ID) {
+    switch (key) {
+      case 'RPC_URL':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_RPC_URL;
+      case 'ALCHEMIST_ADDRESS':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_ALCHEMIST_ADDRESS;
+      case 'POSITION_NFT_ADDRESS':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_POSITION_NFT_ADDRESS;
+      case 'TRANSMUTER_ADDRESS':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_TRANSMUTER_ADDRESS;
+      case 'DEBT_TOKEN_ADDRESS':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_DEBT_TOKEN_ADDRESS;
+      case 'UNDERLYING_TOKEN_ADDRESS':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_UNDERLYING_TOKEN_ADDRESS;
+      case 'MYT_ADDRESS':
+        return process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_MYT_ADDRESS;
+      default:
+        return undefined;
+    }
+  }
+
+  switch (key) {
+    case 'RPC_URL':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_RPC_URL;
+    case 'ALCHEMIST_ADDRESS':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_ALCHEMIST_ADDRESS;
+    case 'POSITION_NFT_ADDRESS':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_POSITION_NFT_ADDRESS;
+    case 'TRANSMUTER_ADDRESS':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_TRANSMUTER_ADDRESS;
+    case 'DEBT_TOKEN_ADDRESS':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_DEBT_TOKEN_ADDRESS;
+    case 'UNDERLYING_TOKEN_ADDRESS':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_UNDERLYING_TOKEN_ADDRESS;
+    case 'MYT_ADDRESS':
+      return process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_MYT_ADDRESS;
+    default:
+      return undefined;
+  }
+}
+
+function readChainAddress(chainId: SupportedV3ChainId, key: V3ChainEnvKey): Address {
+  return readAddress(readChainEnv(chainId, key));
+}
+
+function buildV3Config(chainId: SupportedV3ChainId): V3ProtocolConfig {
+  const legacyChainId = readSupportedChainId(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID);
+  const useLegacyFallback = chainId === legacyChainId;
+  const chainAlchemistAddress = readChainAddress(chainId, 'ALCHEMIST_ADDRESS');
+  const chainPositionNftAddress = readChainAddress(chainId, 'POSITION_NFT_ADDRESS');
+  const chainTransmuterAddress = readChainAddress(chainId, 'TRANSMUTER_ADDRESS');
+  const chainDebtTokenAddress = readChainAddress(chainId, 'DEBT_TOKEN_ADDRESS');
+  const chainUnderlyingTokenAddress = readChainAddress(chainId, 'UNDERLYING_TOKEN_ADDRESS');
+  const chainMytAddress = readChainAddress(chainId, 'MYT_ADDRESS');
+  const alchemistAddress = isConfiguredAddress(chainAlchemistAddress)
+    ? chainAlchemistAddress
+    : readAddress(useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS : undefined);
+  const positionNftAddress = isConfiguredAddress(chainPositionNftAddress)
+    ? chainPositionNftAddress
+    : readAddress(useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_POSITION_NFT_ADDRESS : undefined);
+  const transmuterAddress = isConfiguredAddress(chainTransmuterAddress)
+    ? chainTransmuterAddress
+    : readAddress(useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_TRANSMUTER_ADDRESS : undefined);
+  const debtTokenAddress = isConfiguredAddress(chainDebtTokenAddress)
+    ? chainDebtTokenAddress
+    : readAddress(useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_DEBT_TOKEN_ADDRESS : undefined);
+  const underlyingTokenAddress = isConfiguredAddress(chainUnderlyingTokenAddress)
+    ? chainUnderlyingTokenAddress
+    : readAddress(useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_UNDERLYING_TOKEN_ADDRESS : undefined);
+  const mytAddress = isConfiguredAddress(chainMytAddress)
+    ? chainMytAddress
+    : readAddress(useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_MYT_ADDRESS : undefined);
+  const rpcUrl =
+    readChainEnv(chainId, 'RPC_URL') ||
+    (useLegacyFallback ? process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL : undefined) ||
+    null;
+
+  return {
+    enabled: readBoolean(process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3),
+    chainId,
+    rpcUrl,
     alchemistAddress,
     positionNftAddress,
     transmuterAddress,
     debtTokenAddress,
     underlyingTokenAddress,
-  ].every(isConfiguredAddress),
+    mytAddress,
+    isConfigured: [
+      alchemistAddress,
+      positionNftAddress,
+      transmuterAddress,
+      debtTokenAddress,
+      underlyingTokenAddress,
+    ].every(isConfiguredAddress),
+  };
+}
+
+export const v3Configs: Record<SupportedV3ChainId, V3ProtocolConfig> = {
+  [V3_MAINNET_CHAIN_ID]: buildV3Config(V3_MAINNET_CHAIN_ID),
+  [V3_TESTNET_CHAIN_ID]: buildV3Config(V3_TESTNET_CHAIN_ID),
 };
 
-export function canUseContractV3(): boolean {
-  return v3Config.isConfigured && !!v3Config.rpcUrl;
+export function getV3Config(
+  chainId: number = readSupportedChainId(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID),
+): V3ProtocolConfig {
+  const supportedChainId = isSupportedV3ChainId(chainId)
+    ? chainId
+    : readSupportedChainId(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID);
+  return v3Configs[supportedChainId];
+}
+
+export const v3Config = getV3Config(readSupportedChainId(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID));
+
+export function canUseContractV3(chainId: number = v3Config.chainId): boolean {
+  const config = getV3Config(chainId);
+  return config.isConfigured && !!config.rpcUrl;
 }

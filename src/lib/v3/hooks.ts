@@ -14,7 +14,7 @@ function formatHookError(error: unknown): string {
   return 'Unknown V3 integration error.';
 }
 
-export function useV3Positions(owner?: Address) {
+export function useV3Positions(owner?: Address, chainId: number = v3Config.chainId) {
   const [positions, setPositions] = useState<V3PositionSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function useV3Positions(owner?: Address) {
       };
     }
 
-    const adapter = getV3Adapter();
+    const adapter = getV3Adapter(chainId);
     if (!adapter.isReady()) {
       setPositions([]);
       setError('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
@@ -68,7 +68,7 @@ export function useV3Positions(owner?: Address) {
     return () => {
       cancelled = true;
     };
-  }, [owner, reloadKey]);
+  }, [chainId, owner, reloadKey]);
 
   return {
     positions,
@@ -79,7 +79,7 @@ export function useV3Positions(owner?: Address) {
   };
 }
 
-export function useV3Position(tokenId?: bigint, owner?: Address) {
+export function useV3Position(tokenId?: bigint, owner?: Address, chainId: number = v3Config.chainId) {
   const [position, setPosition] = useState<V3PositionDetail | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export function useV3Position(tokenId?: bigint, owner?: Address) {
       };
     }
 
-    const adapter = getV3Adapter();
+    const adapter = getV3Adapter(chainId);
     if (!adapter.isReady()) {
       setPosition(null);
       setError('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
@@ -133,7 +133,7 @@ export function useV3Position(tokenId?: bigint, owner?: Address) {
     return () => {
       cancelled = true;
     };
-  }, [owner, tokenId, reloadKey]);
+  }, [chainId, owner, tokenId, reloadKey]);
 
   return {
     position,
@@ -144,7 +144,7 @@ export function useV3Position(tokenId?: bigint, owner?: Address) {
   };
 }
 
-export function useV3ProtocolState() {
+export function useV3ProtocolState(chainId: number = v3Config.chainId) {
   const [protocolState, setProtocolState] = useState<V3ProtocolState | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +162,7 @@ export function useV3ProtocolState() {
       };
     }
 
-    const adapter = getV3Adapter();
+    const adapter = getV3Adapter(chainId);
     if (!adapter.isReady()) {
       setProtocolState(null);
       setError('Alchemix V3 is not configured yet. Set RPC URL and contract addresses.');
@@ -198,7 +198,7 @@ export function useV3ProtocolState() {
     return () => {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [chainId, reloadKey]);
 
   return {
     protocolState,
