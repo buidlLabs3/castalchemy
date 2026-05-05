@@ -12,6 +12,21 @@ const miniAppEmbed = JSON.stringify({
   button: {
     title: 'Open CastAlchemy',
     action: {
+      type: 'launch_miniapp',
+      name: 'CastAlchemy',
+      url: `${appUrl}/miniapp`,
+      splashImageUrl: `${appUrl}/frame-cover.svg`,
+      splashBackgroundColor: '#0a0a0a',
+    },
+  },
+});
+
+const legacyFrameEmbed = JSON.stringify({
+  version: '1',
+  imageUrl: `${appUrl}/frame-cover.svg`,
+  button: {
+    title: 'Open CastAlchemy',
+    action: {
       type: 'launch_frame',
       name: 'CastAlchemy',
       url: `${appUrl}/miniapp`,
@@ -28,7 +43,7 @@ export const metadata: Metadata = {
   other: {
     'fc:miniapp': miniAppEmbed,
     // Legacy fallback for clients that still read fc:frame tags.
-    'fc:frame': miniAppEmbed,
+    'fc:frame': legacyFrameEmbed,
     'fc:frame:image': `${appUrl}/frame-cover.svg`,
     'fc:frame:image:aspect_ratio': '1.91:1',
     'fc:frame:button:1': 'Open CastAlchemy',
