@@ -11,9 +11,8 @@ import { NextResponse } from 'next/server';
 import { getMarketSnapshots, formatMarketPercent } from '@/lib/market/snapshots';
 
 const APP_URL =
-  process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_APP_URL || 'https://castalchemy.vercel.app';
+  process.env.NEXT_PUBLIC_APP_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://castalchemy.vercel.app');
 
 /**
  * GET /api/cast-action
