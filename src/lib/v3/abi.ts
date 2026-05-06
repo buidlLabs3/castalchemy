@@ -274,6 +274,36 @@ export const alchemistV3WriteAbi = [
   },
 ] as const;
 
+// ─── User-facing Router functions ───────────────────────────────────────
+// Source: alchemix-finance/v3 — src/router/AlchemistRouter.sol
+export const alchemistV3RouterAbi = [
+  {
+    name: 'depositUnderlying',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'borrowAmount', type: 'uint256' },
+      { name: 'minSharesOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    name: 'depositETH',
+    type: 'function',
+    stateMutability: 'payable',
+    inputs: [
+      { name: 'tokenId', type: 'uint256' },
+      { name: 'borrowAmount', type: 'uint256' },
+      { name: 'minSharesOut', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
 // ─── Position NFT (ERC-721 Enumerable) ──────────────────────────────
 export const alchemistV3PositionNftAbi = [
   {

@@ -1,10 +1,19 @@
 import type { Address, Hex } from 'viem';
 
 export type V3HealthState = 'safe' | 'watch' | 'danger';
+export type V3MarketId = 'usdc' | 'eth';
 
 export interface V3ProtocolConfig {
   enabled: boolean;
   chainId: number;
+  marketId: V3MarketId;
+  marketLabel: string;
+  baseAssetSymbol: string;
+  debtTokenSymbol: string;
+  underlyingDecimals: number;
+  debtTokenDecimals: number;
+  mytDecimals: number;
+  usesNativeEth: boolean;
   rpcUrl: string | null;
   alchemistAddress: Address;
   positionNftAddress: Address;
@@ -12,10 +21,15 @@ export interface V3ProtocolConfig {
   debtTokenAddress: Address;
   underlyingTokenAddress: Address;
   mytAddress: Address;
+  routerAddress: Address;
   isConfigured: boolean;
 }
 
 export interface V3PositionSummary {
+  marketId: V3MarketId;
+  marketLabel: string;
+  baseAssetSymbol: string;
+  debtTokenSymbol: string;
   tokenId: bigint;
   owner: Address;
   collateral: bigint;
@@ -57,6 +71,9 @@ export interface PrepareDepositParams {
   amount: bigint;
   recipient: Address;
   recipientId?: bigint;
+  borrowAmount?: bigint;
+  minSharesOut?: bigint;
+  deadline?: bigint;
 }
 
 export interface PrepareWithdrawParams {

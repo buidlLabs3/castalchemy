@@ -8,10 +8,11 @@ import {
   parseOptionalTokenId,
   parseV3ChainId,
   parseV3AmountInput,
+  parseV3MarketId,
   parseV3Recipient,
   toV3TransactionResponse,
 } from './server';
-import { getV3Config } from './config';
+import { getV3Config, ZERO_ADDRESS } from './config';
 import { encodeFunctionData } from 'viem';
 
 /** Standard ERC-20 approve ABI fragment. */
@@ -32,14 +33,20 @@ export async function buildV3DepositTransactionResponse(
   searchParams: URLSearchParams,
 ): Promise<TransactionResponse> {
   const recipient = parseV3Recipient(searchParams.get('recipient'));
-  const amount = parseV3AmountInput(searchParams.get('amount'), 'Deposit amount');
-  const recipientId = parseOptionalTokenId(searchParams.get('recipientId'), 'Recipient');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const adapter = getServerV3Adapter(chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const config = getV3Config(chainId, marketId);
+  const amount = parseV3AmountInput(searchParams.get('amount'), 'Deposit amount', config.underlyingDecimals);
+  const borrowAmount = searchParams.has('borrowAmount')
+    ? parseV3AmountInput(searchParams.get('borrowAmount'), 'Borrow amount', config.debtTokenDecimals)
+    : 0n;
+  const recipientId = parseOptionalTokenId(searchParams.get('recipientId'), 'Recipient');
+  const adapter = getServerV3Adapter(chainId, marketId);
   const tx = await adapter.prepareDeposit({
     amount,
     recipient,
     recipientId,
+    borrowAmount,
   });
 
   return toV3TransactionResponse(tx);
@@ -50,13 +57,15 @@ export async function buildV3WithdrawTransactionResponse(
 ): Promise<TransactionResponse> {
   const recipient = parseV3Recipient(searchParams.get('recipient'));
   const owner = parseV3Recipient(searchParams.get('owner') ?? searchParams.get('recipient'), 'Owner');
-  const amount = parseV3AmountInput(searchParams.get('amount'), 'Withdraw amount');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const config = getV3Config(chainId, marketId);
+  const amount = parseV3AmountInput(searchParams.get('amount'), 'Withdraw amount', config.mytDecimals);
+  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId, marketId);
 
   assertV3Withdrawable(position, amount);
 
-  const adapter = getServerV3Adapter(chainId);
+  const adapter = getServerV3Adapter(chainId, marketId);
   const tx = await adapter.prepareWithdraw({
     tokenId: position.tokenId,
     amount,
@@ -71,13 +80,15 @@ export async function buildV3BorrowTransactionResponse(
 ): Promise<TransactionResponse> {
   const recipient = parseV3Recipient(searchParams.get('recipient'));
   const owner = parseV3Recipient(searchParams.get('owner') ?? searchParams.get('recipient'), 'Owner');
-  const amount = parseV3AmountInput(searchParams.get('amount'), 'Borrow amount');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const config = getV3Config(chainId, marketId);
+  const amount = parseV3AmountInput(searchParams.get('amount'), 'Borrow amount', config.debtTokenDecimals);
+  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId, marketId);
 
   assertV3Borrowable(position, amount);
 
-  const adapter = getServerV3Adapter(chainId);
+  const adapter = getServerV3Adapter(chainId, marketId);
   const tx = await adapter.prepareMint({
     tokenId: position.tokenId,
     amount,
@@ -91,13 +102,15 @@ export async function buildV3RepayTransactionResponse(
   searchParams: URLSearchParams,
 ): Promise<TransactionResponse> {
   const owner = parseV3Recipient(searchParams.get('owner'), 'Owner');
-  const amount = parseV3AmountInput(searchParams.get('amount'), 'Repay amount');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const config = getV3Config(chainId, marketId);
+  const amount = parseV3AmountInput(searchParams.get('amount'), 'Repay amount', config.mytDecimals);
+  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId, marketId);
 
   assertV3DebtAmount(position, amount, 'repay');
 
-  const adapter = getServerV3Adapter(chainId);
+  const adapter = getServerV3Adapter(chainId, marketId);
   const tx = await adapter.prepareRepay({
     amount,
     recipientTokenId: position.tokenId,
@@ -110,13 +123,15 @@ export async function buildV3BurnTransactionResponse(
   searchParams: URLSearchParams,
 ): Promise<TransactionResponse> {
   const owner = parseV3Recipient(searchParams.get('owner'), 'Owner');
-  const amount = parseV3AmountInput(searchParams.get('amount'), 'Burn amount');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const config = getV3Config(chainId, marketId);
+  const amount = parseV3AmountInput(searchParams.get('amount'), 'Burn amount', config.debtTokenDecimals);
+  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId, marketId);
 
   assertV3DebtAmount(position, amount, 'burn');
 
-  const adapter = getServerV3Adapter(chainId);
+  const adapter = getServerV3Adapter(chainId, marketId);
   const tx = await adapter.prepareBurn({
     amount,
     recipientTokenId: position.tokenId,
@@ -131,13 +146,14 @@ export async function buildV3SelfLiquidateTransactionResponse(
   const owner = parseV3Recipient(searchParams.get('owner'), 'Owner');
   const recipient = parseV3Recipient(searchParams.get('recipient') ?? searchParams.get('owner'), 'Recipient');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const position = await getOwnedV3Position(owner, searchParams.get('tokenId'), 'Position', chainId, marketId);
 
   if (position.debt === 0n) {
     throw new Error('This position has no debt to self-liquidate.');
   }
 
-  const adapter = getServerV3Adapter(chainId);
+  const adapter = getServerV3Adapter(chainId, marketId);
   const tx = await adapter.prepareSelfLiquidate({
     accountId: position.tokenId,
     recipient,
@@ -154,19 +170,24 @@ export async function buildV3SelfLiquidateTransactionResponse(
 export function buildV3ApproveTransactionResponse(
   searchParams: URLSearchParams,
 ): TransactionResponse {
-  const amount = parseV3AmountInput(searchParams.get('amount'), 'Approval amount');
   const chainId = parseV3ChainId(searchParams.get('chainId'));
-  const chainConfig = getV3Config(chainId);
+  const marketId = parseV3MarketId(searchParams.get('market'));
+  const chainConfig = getV3Config(chainId, marketId);
+  const amount = parseV3AmountInput(searchParams.get('amount'), 'Approval amount', chainConfig.underlyingDecimals);
   const tokenAddress = chainConfig.underlyingTokenAddress;
 
-  if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
+  if (chainConfig.usesNativeEth) {
+    throw new Error('Native ETH deposits do not need an ERC-20 approval.');
+  }
+
+  if (!tokenAddress || tokenAddress === ZERO_ADDRESS) {
     throw new Error('Underlying token address is not configured.');
   }
 
   const data = encodeFunctionData({
     abi: erc20ApproveAbi,
     functionName: 'approve',
-    args: [chainConfig.alchemistAddress, amount],
+    args: [chainConfig.routerAddress, amount],
   });
 
   return {

@@ -1,8 +1,19 @@
 import type { SendTransactionParameters, TransactionResponse } from 'frog';
-import { isAddress, parseEther, type Address } from 'viem';
+import { isAddress, parseUnits, type Address } from 'viem';
 import { getV3Adapter } from './adapter';
-import { isSupportedV3ChainId, SUPPORTED_V3_CHAIN_IDS, v3Config } from './config';
-import type { PreparedV3Transaction, V3Adapter, V3PositionDetail, V3PositionSummary } from './types';
+import {
+  isSupportedV3ChainId,
+  isSupportedV3MarketId,
+  SUPPORTED_V3_CHAIN_IDS,
+  v3Config,
+} from './config';
+import type {
+  PreparedV3Transaction,
+  V3Adapter,
+  V3MarketId,
+  V3PositionDetail,
+  V3PositionSummary,
+} from './types';
 
 const SUPPORTED_FRAME_CHAIN_IDS = new Set<number>(SUPPORTED_V3_CHAIN_IDS);
 
@@ -22,14 +33,29 @@ export function parseV3ChainId(value: string | null | undefined): number {
   const parsed = Number(value);
 
   if (!Number.isInteger(parsed) || !isSupportedV3ChainId(parsed)) {
-    throw new Error('Chain must be Ethereum mainnet or Sepolia.');
+    throw new Error('Chain must be Ethereum mainnet.');
   }
 
   return parsed;
 }
 
-export function getServerV3Adapter(chainId: number = v3Config.chainId): V3Adapter {
-  const adapter = getV3Adapter(chainId);
+export function parseV3MarketId(value: string | null | undefined): V3MarketId {
+  if (!value) {
+    return v3Config.marketId;
+  }
+
+  if (!isSupportedV3MarketId(value)) {
+    throw new Error('Market must be USDC/alUSD or ETH/alETH.');
+  }
+
+  return value;
+}
+
+export function getServerV3Adapter(
+  chainId: number = v3Config.chainId,
+  marketId: string = v3Config.marketId,
+): V3Adapter {
+  const adapter = getV3Adapter(chainId, marketId);
 
   if (!adapter.config.enabled) {
     throw new Error('Alchemix V3 is currently disabled.');
@@ -42,7 +68,7 @@ export function getServerV3Adapter(chainId: number = v3Config.chainId): V3Adapte
   return adapter;
 }
 
-export function parseV3AmountInput(value: string | null | undefined, label = 'Amount'): bigint {
+export function parseV3AmountInput(value: string | null | undefined, label = 'Amount', decimals = 18): bigint {
   const normalized = value?.trim();
 
   if (!normalized) {
@@ -52,7 +78,7 @@ export function parseV3AmountInput(value: string | null | undefined, label = 'Am
   let parsed: bigint;
 
   try {
-    parsed = parseEther(normalized);
+    parsed = parseUnits(normalized, decimals);
   } catch {
     throw new Error(`${label} must be a valid decimal amount.`);
   }
@@ -107,9 +133,10 @@ export async function getOwnedV3Position(
   tokenIdValue: string | null | undefined,
   label = 'Position',
   chainId: number = v3Config.chainId,
+  marketId: string = v3Config.marketId,
 ): Promise<V3PositionDetail> {
   const tokenId = parseRequiredTokenId(tokenIdValue, label);
-  const adapter = getServerV3Adapter(chainId);
+  const adapter = getServerV3Adapter(chainId, marketId);
   const position = await adapter.getPosition(tokenId, owner);
 
   if (!position) {

@@ -2,21 +2,24 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { formatEther, parseEther } from 'viem';
+import { formatUnits, parseUnits, toHex } from 'viem';
 import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import styles from '../page.module.css';
 import {
   canUseContractV3,
   getV3Adapter,
   getV3ChainMetadata,
+  getV3Config,
+  getSupportedV3Markets,
   SUPPORTED_V3_CHAIN_IDS,
+  useSelectedV3MarketId,
   useSelectedV3ChainId,
   useV3Positions,
   useV3ProtocolState,
   ZERO_ADDRESS,
 } from '@/lib/v3';
 import type { PreparedV3Transaction } from '@/lib/v3';
-import { useWallet } from '@/lib/wallet/hooks';
+import { getWalletProvider, useWallet } from '@/lib/wallet/hooks';
 
 type V3Action = 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'burn' | 'selfLiquidate';
 
@@ -32,24 +35,24 @@ function getExplorerBaseUrl(chainId: number): string {
   return getV3ChainMetadata(chainId).explorerUrl;
 }
 
-function formatTokenAmount(value: bigint): string {
-  return Number.parseFloat(formatEther(value)).toFixed(4);
+function formatTokenAmount(value: bigint, decimals = 18): string {
+  return Number.parseFloat(formatUnits(value, decimals)).toFixed(4);
 }
 
 function formatHealth(value: number): string {
   return Number.isFinite(value) ? value.toFixed(2) : 'INF';
 }
 
-function parseAmountInput(value: string): bigint | null {
+function parseAmountInput(value: string, decimals = 18, allowZero = false): bigint | null {
   const normalized = value.trim();
 
   if (!normalized) {
-    return null;
+    return allowZero ? 0n : null;
   }
 
   try {
-    const parsed = parseEther(normalized);
-    return parsed > 0n ? parsed : null;
+    const parsed = parseUnits(normalized, decimals);
+    return parsed > 0n || (allowZero && parsed === 0n) ? parsed : null;
   } catch {
     return null;
   }
@@ -57,13 +60,20 @@ function parseAmountInput(value: string): bigint | null {
 
 export default function MiniAppV3Page() {
   const { selectedChainId, setSelectedChainId } = useSelectedV3ChainId();
+  const { selectedMarketId, setSelectedMarketId } = useSelectedV3MarketId();
   const chain = getV3ChainMetadata(selectedChainId);
+  const market = getV3Config(selectedChainId, selectedMarketId);
+  const markets = getSupportedV3Markets(selectedChainId);
   const { address, isConnected, isConnecting, walletMode } = useWallet();
-  const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address, selectedChainId);
+  const { positions, isLoading, error, isEnabled, reload } = useV3Positions(address, selectedChainId, selectedMarketId);
   const { sendTransaction, data: txHash, error: sendError, isPending: isSending } = useSendTransaction();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const [farcasterTxHash, setFarcasterTxHash] = useState<`0x${string}` | undefined>();
+  const [isFarcasterSending, setIsFarcasterSending] = useState(false);
+  const submittedTxHash = txHash ?? farcasterTxHash;
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: submittedTxHash });
 
   const [depositAmount, setDepositAmount] = useState('1');
+  const [depositBorrowAmount, setDepositBorrowAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('0.50');
   const [borrowAmount, setBorrowAmount] = useState('0.25');
   const [repayAmount, setRepayAmount] = useState('0.10');
@@ -75,7 +85,7 @@ export default function MiniAppV3Page() {
   const [isPreparing, setIsPreparing] = useState(false);
   const [requestedAction, setRequestedAction] = useState<string | null>(null);
 
-  const { protocolState } = useV3ProtocolState(selectedChainId);
+  const { protocolState } = useV3ProtocolState(selectedChainId, selectedMarketId);
 
   const preferredAction: V3Action =
     requestedAction === 'withdraw' ||
@@ -87,13 +97,14 @@ export default function MiniAppV3Page() {
       : 'deposit';
   const selectedPosition = positions.find((position) => position.tokenId.toString() === selectedTokenId) ?? null;
 
-  const depositAmountValue = parseAmountInput(depositAmount);
-  const withdrawAmountValue = parseAmountInput(withdrawAmount);
-  const borrowAmountValue = parseAmountInput(borrowAmount);
-  const repayAmountValue = parseAmountInput(repayAmount);
-  const burnAmountValue = parseAmountInput(burnAmount);
+  const depositAmountValue = parseAmountInput(depositAmount, market.underlyingDecimals);
+  const depositBorrowAmountValue = parseAmountInput(depositBorrowAmount, market.debtTokenDecimals, true);
+  const withdrawAmountValue = parseAmountInput(withdrawAmount, market.mytDecimals);
+  const borrowAmountValue = parseAmountInput(borrowAmount, market.debtTokenDecimals);
+  const repayAmountValue = parseAmountInput(repayAmount, market.mytDecimals);
+  const burnAmountValue = parseAmountInput(burnAmount, market.debtTokenDecimals);
 
-  const canPrepareDeposit = !!address && !!depositAmountValue;
+  const canPrepareDeposit = !!address && !!depositAmountValue && depositBorrowAmountValue !== null;
   const canPrepareWithdraw =
     !!address &&
     !!selectedPosition &&
@@ -117,9 +128,8 @@ export default function MiniAppV3Page() {
     !!burnAmountValue &&
     burnAmountValue <= selectedPosition.debt;
 
-  const v3Live = canUseContractV3(selectedChainId);
-  const canSubmitPreparedTx =
-    walletMode === 'external' && !!preparedTx && v3Live && preparedTx.to !== ZERO_ADDRESS;
+  const v3Live = canUseContractV3(selectedChainId, selectedMarketId);
+  const canSubmitPreparedTx = !!preparedTx && v3Live && preparedTx.to !== ZERO_ADDRESS && !!address;
   const modeLabel = v3Live ? 'Contracts' : 'Needs addresses';
 
   const walletSummary = isConnecting
@@ -166,6 +176,7 @@ export default function MiniAppV3Page() {
       const tx = await build();
       setPreparedTx(tx);
       setTxLabel(label);
+      setFarcasterTxHash(undefined);
     } catch (nextError) {
       setPreparedTx(null);
       setTxLabel(null);
@@ -189,11 +200,12 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       'Deposit (new position)',
       async () => {
-        const adapter = getV3Adapter(selectedChainId);
+        const adapter = getV3Adapter(selectedChainId, selectedMarketId);
         return adapter.prepareDeposit({
           amount: depositAmountValue,
           recipient: address,
           recipientId: 0n,
+          borrowAmount: depositBorrowAmountValue ?? 0n,
         });
       },
       'Failed to prepare deposit transaction.',
@@ -229,7 +241,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Withdraw from position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter(selectedChainId);
+        const adapter = getV3Adapter(selectedChainId, selectedMarketId);
         return adapter.prepareWithdraw({
           tokenId: BigInt(selectedTokenId),
           amount: withdrawAmountValue,
@@ -269,7 +281,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Borrow from position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter(selectedChainId);
+        const adapter = getV3Adapter(selectedChainId, selectedMarketId);
         return adapter.prepareMint({
           tokenId: BigInt(selectedTokenId),
           amount: borrowAmountValue,
@@ -304,7 +316,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Repay for position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter(selectedChainId);
+        const adapter = getV3Adapter(selectedChainId, selectedMarketId);
         return adapter.prepareRepay({
           amount: repayAmountValue,
           recipientTokenId: BigInt(selectedTokenId),
@@ -338,7 +350,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Burn against position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter(selectedChainId);
+        const adapter = getV3Adapter(selectedChainId, selectedMarketId);
         return adapter.prepareBurn({
           amount: burnAmountValue,
           recipientTokenId: BigInt(selectedTokenId),
@@ -367,7 +379,7 @@ export default function MiniAppV3Page() {
     await prepareTransaction(
       `Self-liquidate position #${selectedTokenId}`,
       async () => {
-        const adapter = getV3Adapter(selectedChainId);
+        const adapter = getV3Adapter(selectedChainId, selectedMarketId);
         return adapter.prepareSelfLiquidate({
           accountId: BigInt(selectedTokenId),
           recipient: address,
@@ -377,12 +389,40 @@ export default function MiniAppV3Page() {
     );
   };
 
-  const handleSendPreparedTransaction = () => {
+  const handleSendPreparedTransaction = async () => {
     if (!preparedTx) {
       return;
     }
 
     setTxError(null);
+
+    if (walletMode === 'farcaster') {
+      if (!address) {
+        setTxError('Connect your Farcaster wallet before sending.');
+        return;
+      }
+
+      setIsFarcasterSending(true);
+      try {
+        const provider = await getWalletProvider('farcaster');
+        const hash = await provider.request({
+          method: 'eth_sendTransaction',
+          params: [{
+            from: address,
+            to: preparedTx.to,
+            data: preparedTx.data,
+            value: toHex(preparedTx.value),
+          }],
+        });
+
+        setFarcasterTxHash(hash as `0x${string}`);
+      } catch (nextError) {
+        setTxError(nextError instanceof Error ? nextError.message : 'Farcaster wallet rejected the transaction.');
+      } finally {
+        setIsFarcasterSending(false);
+      }
+      return;
+    }
 
     sendTransaction({
       chainId: preparedTx.chainId,
@@ -413,6 +453,7 @@ export default function MiniAppV3Page() {
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>Alchemix V3</span>
                 <span className={styles.networkBadge}>{chain.shortLabel}</span>
+                <span className={styles.networkBadge}>{market.marketLabel}</span>
                 <span className={v3Live ? styles.readyBadge : styles.warningBadge}>
                   {v3Live ? 'Live V3' : 'Needs addresses'}
                 </span>
@@ -444,6 +485,20 @@ export default function MiniAppV3Page() {
                   })}
                 </select>
               </label>
+              <label className={styles.field}>
+                <span>Market</span>
+                <select
+                  value={selectedMarketId}
+                  onChange={(event) => setSelectedMarketId(event.target.value)}
+                  className={styles.input}
+                >
+                  {markets.map((option) => (
+                    <option key={option.marketId} value={option.marketId}>
+                      {option.marketLabel}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <Link href="/miniapp" className={styles.secondaryButton}>
                 Dashboard
               </Link>
@@ -460,7 +515,7 @@ export default function MiniAppV3Page() {
               <span className={styles.metricLabel}>Mode</span>
               <strong>{modeLabel}</strong>
               <span className={styles.metricFoot}>
-                {v3Live ? 'Live on-chain' : `Set real ${chain.shortLabel} V3 contract addresses`}
+                {v3Live ? `${market.marketLabel} contracts verified` : `Set a real ${chain.shortLabel} RPC URL`}
               </span>
             </div>
             <div className={styles.metricCard}>
@@ -534,11 +589,11 @@ export default function MiniAppV3Page() {
                       </span>
                     </div>
                     <div className={styles.v3Metrics}>
-                      <span>Collateral {formatTokenAmount(position.collateral)}</span>
-                      <span>Debt {formatTokenAmount(position.debt)}</span>
-                      <span>Earmarked {formatTokenAmount(position.earmarked)}</span>
-                      <span>Available {formatTokenAmount(position.availableCredit)}</span>
-                      <span>Max withdraw {formatTokenAmount(position.maxWithdrawable)}</span>
+                    <span>Collateral {formatTokenAmount(position.collateral, market.mytDecimals)} MYT</span>
+                    <span>Debt {formatTokenAmount(position.debt, market.debtTokenDecimals)} {market.debtTokenSymbol}</span>
+                    <span>Earmarked {formatTokenAmount(position.earmarked, market.debtTokenDecimals)}</span>
+                    <span>Available {formatTokenAmount(position.availableCredit, market.debtTokenDecimals)}</span>
+                    <span>Max withdraw {formatTokenAmount(position.maxWithdrawable, market.mytDecimals)} MYT</span>
                       <span>Health {formatHealth(position.healthFactor)}</span>
                     </div>
                   </div>
@@ -577,7 +632,7 @@ export default function MiniAppV3Page() {
                     <option value="">Select a position</option>
                     {positions.map((position) => (
                       <option key={position.tokenId.toString()} value={position.tokenId.toString()}>
-                        #{position.tokenId.toString()} ({formatTokenAmount(position.availableCredit)} available)
+                        #{position.tokenId.toString()} ({formatTokenAmount(position.availableCredit, market.debtTokenDecimals)} {market.debtTokenSymbol} available)
                       </option>
                     ))}
                   </select>
@@ -590,11 +645,11 @@ export default function MiniAppV3Page() {
                 )}
                 {selectedPosition ? (
                   <div className={styles.v3Metrics}>
-                    <span>Collateral {formatTokenAmount(selectedPosition.collateral)}</span>
-                    <span>Debt {formatTokenAmount(selectedPosition.debt)}</span>
-                    <span>Earmarked {formatTokenAmount(selectedPosition.earmarked)}</span>
-                    <span>Available {formatTokenAmount(selectedPosition.availableCredit)}</span>
-                    <span>Max withdraw {formatTokenAmount(selectedPosition.maxWithdrawable)}</span>
+                    <span>Collateral {formatTokenAmount(selectedPosition.collateral, market.mytDecimals)} MYT</span>
+                    <span>Debt {formatTokenAmount(selectedPosition.debt, market.debtTokenDecimals)} {market.debtTokenSymbol}</span>
+                    <span>Earmarked {formatTokenAmount(selectedPosition.earmarked, market.debtTokenDecimals)}</span>
+                    <span>Available {formatTokenAmount(selectedPosition.availableCredit, market.debtTokenDecimals)}</span>
+                    <span>Max withdraw {formatTokenAmount(selectedPosition.maxWithdrawable, market.mytDecimals)} MYT</span>
                     <span>Health {formatHealth(selectedPosition.healthFactor)}</span>
                   </div>
                 ) : (
@@ -608,10 +663,10 @@ export default function MiniAppV3Page() {
                     preferredAction === 'deposit' ? styles.v3ActionCardActive : ''
                   }`}
                 >
-                  <span className={styles.infoLabel}>New deposit</span>
-                  <strong>Create a tokenId-backed position</strong>
+                  <span className={styles.infoLabel}>{market.marketLabel}</span>
+                  <strong>Deposit and optionally borrow</strong>
                   <label className={styles.field}>
-                    <span>Amount</span>
+                    <span>Deposit {market.baseAssetSymbol}</span>
                     <input
                       type="number"
                       min="0"
@@ -621,13 +676,27 @@ export default function MiniAppV3Page() {
                       className={styles.input}
                     />
                   </label>
-                  <p>This creates a fresh position with recipientId `0`.</p>
+                  <label className={styles.field}>
+                    <span>Borrow {market.debtTokenSymbol}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={depositBorrowAmount}
+                      onChange={(event) => setDepositBorrowAmount(event.target.value)}
+                      className={styles.input}
+                      placeholder="Optional"
+                    />
+                  </label>
+                  <p>
+                    Uses the official V3 router. {market.usesNativeEth ? 'Native ETH is sent with the transaction.' : `${market.baseAssetSymbol} approval to the router is required before deposit.`}
+                  </p>
                   <button
                     className={styles.primaryButton}
                     onClick={handlePrepareDeposit}
                     disabled={isPreparing || !canPrepareDeposit}
                   >
-                    Prepare deposit
+                    Prepare deposit{depositBorrowAmountValue && depositBorrowAmountValue > 0n ? ' + borrow' : ''}
                   </button>
                 </div>
 
@@ -639,7 +708,7 @@ export default function MiniAppV3Page() {
                   <span className={styles.infoLabel}>Withdraw</span>
                   <strong>Withdraw collateral from position</strong>
                   <label className={styles.field}>
-                    <span>Amount</span>
+                    <span>Amount (MYT shares)</span>
                     <input
                       type="number"
                       min="0"
@@ -650,7 +719,7 @@ export default function MiniAppV3Page() {
                     />
                   </label>
                   <p>
-                    Max withdrawable: {selectedPosition ? formatTokenAmount(selectedPosition.maxWithdrawable) : '0.0000'}
+                    Max withdrawable: {selectedPosition ? formatTokenAmount(selectedPosition.maxWithdrawable, market.mytDecimals) : '0.0000'} MYT
                   </p>
                   <button
                     className={styles.primaryButton}
@@ -669,7 +738,7 @@ export default function MiniAppV3Page() {
                   <span className={styles.infoLabel}>Borrow</span>
                   <strong>Mint against available credit</strong>
                   <label className={styles.field}>
-                    <span>Amount</span>
+                    <span>Amount ({market.debtTokenSymbol})</span>
                     <input
                       type="number"
                       min="0"
@@ -681,7 +750,7 @@ export default function MiniAppV3Page() {
                   </label>
                   <p>
                     Available credit:{' '}
-                    {selectedPosition ? formatTokenAmount(selectedPosition.availableCredit) : '0.0000'}
+                    {selectedPosition ? formatTokenAmount(selectedPosition.availableCredit, market.debtTokenDecimals) : '0.0000'} {market.debtTokenSymbol}
                   </p>
                   <button
                     className={styles.primaryButton}
@@ -700,7 +769,7 @@ export default function MiniAppV3Page() {
                   <span className={styles.infoLabel}>Repay</span>
                   <strong>Repay debt with collateral</strong>
                   <label className={styles.field}>
-                    <span>Amount</span>
+                    <span>Amount (MYT shares)</span>
                     <input
                       type="number"
                       min="0"
@@ -710,7 +779,7 @@ export default function MiniAppV3Page() {
                       className={styles.input}
                     />
                   </label>
-                  <p>Current debt: {selectedPosition ? formatTokenAmount(selectedPosition.debt) : '0.0000'}</p>
+                  <p>Current debt: {selectedPosition ? formatTokenAmount(selectedPosition.debt, market.debtTokenDecimals) : '0.0000'} {market.debtTokenSymbol}</p>
                   <button
                     className={styles.primaryButton}
                     onClick={handlePrepareRepay}
@@ -728,7 +797,7 @@ export default function MiniAppV3Page() {
                   <span className={styles.infoLabel}>Burn debt tokens</span>
                   <strong>Burn against selected position</strong>
                   <label className={styles.field}>
-                    <span>Amount</span>
+                    <span>Amount ({market.debtTokenSymbol})</span>
                     <input
                       type="number"
                       min="0"
@@ -738,7 +807,7 @@ export default function MiniAppV3Page() {
                       className={styles.input}
                     />
                   </label>
-                  <p>Max burn: {selectedPosition ? formatTokenAmount(selectedPosition.debt) : '0.0000'}</p>
+                  <p>Max burn: {selectedPosition ? formatTokenAmount(selectedPosition.debt, market.debtTokenDecimals) : '0.0000'} {market.debtTokenSymbol}</p>
                   <button
                     className={styles.primaryButton}
                     onClick={handlePrepareBurn}
@@ -759,7 +828,7 @@ export default function MiniAppV3Page() {
                     Uses your collateral to fully repay debt. Only available for healthy (overcollateralized) positions.
                     Remaining collateral is sent to your wallet.
                   </p>
-                  <p>Position debt: {selectedPosition ? formatTokenAmount(selectedPosition.debt) : '0.0000'}</p>
+                  <p>Position debt: {selectedPosition ? formatTokenAmount(selectedPosition.debt, market.debtTokenDecimals) : '0.0000'} {market.debtTokenSymbol}</p>
                   <button
                     className={styles.primaryButton}
                     onClick={handlePrepareSelfLiquidate}
@@ -791,9 +860,9 @@ export default function MiniAppV3Page() {
                     <button
                       className={styles.primaryButton}
                       onClick={handleSendPreparedTransaction}
-                      disabled={!canSubmitPreparedTx || isSending || isConfirming}
+                      disabled={!canSubmitPreparedTx || isSending || isFarcasterSending || isConfirming}
                     >
-                      {isSending
+                      {isSending || isFarcasterSending
                         ? 'Awaiting wallet confirmation...'
                         : isConfirming
                           ? 'Submitting transaction...'
@@ -807,17 +876,17 @@ export default function MiniAppV3Page() {
                     )}
 
                     {v3Live && !canSubmitPreparedTx && (
-                      <p>Connect with an external wallet (browser extension) to sign and broadcast this transaction.</p>
+                      <p>Connect a Farcaster or browser wallet to sign and broadcast this transaction.</p>
                     )}
 
                     {sendError && <div className={styles.callout}>{sendError.message}</div>}
 
-                    {txHash && (
+                    {submittedTxHash && (
                       <div className={styles.v3Kv}>
                         <span className={styles.infoLabel}>Transaction hash</span>
-                        <span className={styles.v3Mono}>{txHash}</span>
+                        <span className={styles.v3Mono}>{submittedTxHash}</span>
                         <a
-                          href={`${getExplorerBaseUrl(preparedTx.chainId)}/tx/${txHash}`}
+                          href={`${getExplorerBaseUrl(preparedTx.chainId)}/tx/${submittedTxHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className={styles.textLink}

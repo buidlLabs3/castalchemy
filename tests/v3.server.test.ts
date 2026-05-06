@@ -4,14 +4,8 @@ import test from 'node:test';
 const OWNER_ADDRESS = '0x0000000000000000000000000000000000000012';
 
 process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3 = 'true';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '11155111';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL = 'https://rpc.sepolia.org';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS = '0x1111111111111111111111111111111111111111';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_POSITION_NFT_ADDRESS = '0x2222222222222222222222222222222222222222';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_TRANSMUTER_ADDRESS = '0x3333333333333333333333333333333333333333';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_DEBT_TOKEN_ADDRESS = '0x4444444444444444444444444444444444444444';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_UNDERLYING_TOKEN_ADDRESS = '0x5555555555555555555555555555555555555555';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_MYT_ADDRESS = '0x6666666666666666666666666666666666666666';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '1';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL = 'https://eth.llamarpc.com';
 
 const configModule = await import('../src/lib/v3/config');
 const serverModule = await import('../src/lib/v3/server');
@@ -24,12 +18,14 @@ const {
   parseOptionalTokenId,
   parseRequiredTokenId,
   parseV3AmountInput,
+  parseV3MarketId,
   parseV3Recipient,
   toV3TransactionResponse,
 } = serverModule;
 
 test('parseV3AmountInput parses positive decimal amounts', () => {
   assert.equal(parseV3AmountInput('1.25', 'Deposit amount'), 1_250_000_000_000_000_000n);
+  assert.equal(parseV3AmountInput('1.25', 'USDC amount', 6), 1_250_000n);
 });
 
 test('parseV3AmountInput rejects invalid values', () => {
@@ -43,6 +39,12 @@ test('parseV3Recipient validates wallet addresses', () => {
   assert.throws(() => parseV3Recipient('not-an-address', 'Owner'), /Owner must be a valid wallet address/);
 });
 
+test('parseV3MarketId only accepts verified V3 markets', () => {
+  assert.equal(parseV3MarketId('usdc'), 'usdc');
+  assert.equal(parseV3MarketId('eth'), 'eth');
+  assert.throws(() => parseV3MarketId('sepolia'), /Market must be USDC\/alUSD or ETH\/alETH/);
+});
+
 test('token id parsing supports optional and required values', () => {
   assert.equal(parseOptionalTokenId(null), undefined);
   assert.equal(parseOptionalTokenId('42'), 42n);
@@ -53,6 +55,10 @@ test('token id parsing supports optional and required values', () => {
 
 test('limit validators reject out-of-range values', () => {
   const position = {
+    marketId: 'usdc' as const,
+    marketLabel: 'USDC / alUSD',
+    baseAssetSymbol: 'USDC',
+    debtTokenSymbol: 'alUSD',
     tokenId: 1n,
     owner: OWNER_ADDRESS as `0x${string}`,
     collateral: 10n ** 18n,
@@ -87,13 +93,13 @@ test('limit validators reject out-of-range values', () => {
 
 test('toV3TransactionResponse formats Farcaster transaction payloads', () => {
   const response = toV3TransactionResponse({
-    chainId: 11155111,
+    chainId: 1,
     to: ZERO_ADDRESS,
     data: '0x',
     value: 0n,
   });
 
-  assert.equal(response.chainId, 'eip155:11155111');
+  assert.equal(response.chainId, 'eip155:1');
   assert.equal(response.method, 'eth_sendTransaction');
   assert.equal(response.params.to, ZERO_ADDRESS);
   assert.equal(response.params.value, '0');

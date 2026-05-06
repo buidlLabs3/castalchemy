@@ -2,17 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const OWNER_ADDRESS = '0x0000000000000000000000000000000000000012';
-const ALCHEMIST_ADDRESS = '0x1111111111111111111111111111111111111111';
+const USDC_ROUTER_ADDRESS = '0x6733aa6b2a622e43e8ff61945e8fbe5f1b6b00fd';
+const ETH_ROUTER_ADDRESS = '0xdb852896a23c7e2519b75aea692cacf834d086ab';
 
 process.env.NEXT_PUBLIC_ENABLE_ALCHEMIX_V3 = 'true';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '11155111';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL = 'https://rpc.sepolia.org';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_ALCHEMIST_ADDRESS = ALCHEMIST_ADDRESS;
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_POSITION_NFT_ADDRESS = '0x2222222222222222222222222222222222222222';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_TRANSMUTER_ADDRESS = '0x3333333333333333333333333333333333333333';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_DEBT_TOKEN_ADDRESS = '0x4444444444444444444444444444444444444444';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_UNDERLYING_TOKEN_ADDRESS = '0x5555555555555555555555555555555555555555';
-process.env.NEXT_PUBLIC_ALCHEMIX_V3_MYT_ADDRESS = '0x6666666666666666666666666666666666666666';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID = '1';
+process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL = 'https://eth.llamarpc.com';
 
 const adapterModule = await import('../src/lib/v3/adapter');
 const httpModule = await import('../src/lib/v3/http');
@@ -26,23 +21,41 @@ const {
   buildV3WithdrawTransactionResponse,
 } = httpModule;
 
-test('buildV3DepositTransactionResponse returns encoded calldata to the Alchemist', async () => {
+test('buildV3DepositTransactionResponse returns encoded calldata to the USDC router', async () => {
   resetV3AdapterForTests();
   const response = await buildV3DepositTransactionResponse(
     new URLSearchParams({
       recipient: OWNER_ADDRESS,
       amount: '1.5',
+      market: 'usdc',
     }),
   );
 
-  assert.equal(response.chainId, 'eip155:11155111');
+  assert.equal(response.chainId, 'eip155:1');
   assert.equal(response.method, 'eth_sendTransaction');
-  assert.equal(response.params.to, ALCHEMIST_ADDRESS);
+  assert.equal(response.params.to, USDC_ROUTER_ADDRESS);
   const data = response.params.data;
   assert.ok(typeof data === 'string');
   assert.match(data, /^0x[0-9a-f]+$/i);
   assert.ok(data.length > 10);
   assert.equal(response.params.value, '0');
+});
+
+test('buildV3DepositTransactionResponse sends native value to the ETH router', async () => {
+  resetV3AdapterForTests();
+  const response = await buildV3DepositTransactionResponse(
+    new URLSearchParams({
+      recipient: OWNER_ADDRESS,
+      amount: '1.5',
+      borrowAmount: '0.25',
+      market: 'eth',
+    }),
+  );
+
+  assert.equal(response.chainId, 'eip155:1');
+  assert.equal(response.method, 'eth_sendTransaction');
+  assert.equal(response.params.to, ETH_ROUTER_ADDRESS);
+  assert.equal(response.params.value, '1500000000000000000');
 });
 
 test('buildV3BorrowTransactionResponse rejects missing recipient', async () => {

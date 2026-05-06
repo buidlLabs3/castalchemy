@@ -6,7 +6,7 @@
 
 import { Button, Frog, TextInput, type FrameContext, type TransactionContext } from 'frog';
 import { handle } from 'frog/next';
-import { formatEther, isAddress, type Address } from 'viem';
+import { formatUnits, isAddress, type Address } from 'viem';
 import { getBotBriefing } from '@/lib/automation/briefings';
 import {
   getEducationLesson,
@@ -48,8 +48,8 @@ const app = new Frog({
   browserLocation: '/miniapp/v3',
 });
 
-function formatFrameAmount(value: bigint): string {
-  return Number.parseFloat(formatEther(value)).toFixed(4);
+function formatFrameAmount(value: bigint, decimals = 18): string {
+  return Number.parseFloat(formatUnits(value, decimals)).toFixed(4);
 }
 
 function formatHealthFactor(value: number): string {
@@ -211,7 +211,7 @@ function getPositionActionConfig(action: PositionActionName) {
         accent: '#f59e0b',
         buttonLabel: 'Withdraw',
         limitLine: (position: V3PositionSummary) =>
-          `Max withdrawable: ${formatFrameAmount(position.maxWithdrawable)}`,
+          `Max withdrawable: ${formatFrameAmount(position.maxWithdrawable)} MYT`,
         validate: (position: V3PositionSummary, amount: bigint) => assertV3Withdrawable(position, amount),
         prepare: (adapter: V3Adapter, position: V3PositionSummary, amount: bigint, wallet: Address) =>
           adapter.prepareWithdraw({
@@ -219,7 +219,7 @@ function getPositionActionConfig(action: PositionActionName) {
             amount,
             recipient: wallet,
           }),
-        reviewLine: (amount: bigint) => `Withdraw: ${formatFrameAmount(amount)} ETH`,
+        reviewLine: (amount: bigint) => `Withdraw: ${formatFrameAmount(amount)} MYT`,
         successLine: 'Your withdraw transaction was sent.',
       };
     case 'borrow':
@@ -228,7 +228,7 @@ function getPositionActionConfig(action: PositionActionName) {
         accent: '#22c55e',
         buttonLabel: 'Borrow',
         limitLine: (position: V3PositionSummary) =>
-          `Available credit: ${formatFrameAmount(position.availableCredit)} ETH`,
+          `Available credit: ${formatFrameAmount(position.availableCredit)} ${position.debtTokenSymbol}`,
         validate: (position: V3PositionSummary, amount: bigint) => assertV3Borrowable(position, amount),
         prepare: (adapter: V3Adapter, position: V3PositionSummary, amount: bigint, wallet: Address) =>
           adapter.prepareMint({
@@ -236,7 +236,7 @@ function getPositionActionConfig(action: PositionActionName) {
             amount,
             recipient: wallet,
           }),
-        reviewLine: (amount: bigint) => `Borrow: ${formatFrameAmount(amount)} ETH`,
+        reviewLine: (amount: bigint) => `Borrow: ${formatFrameAmount(amount)} debt tokens`,
         successLine: 'Your borrow transaction was sent.',
       };
     case 'repay':
@@ -244,14 +244,14 @@ function getPositionActionConfig(action: PositionActionName) {
         title: 'Repay',
         accent: '#38bdf8',
         buttonLabel: 'Repay',
-        limitLine: (position: V3PositionSummary) => `Current debt: ${formatFrameAmount(position.debt)} ETH`,
+        limitLine: (position: V3PositionSummary) => `Current debt: ${formatFrameAmount(position.debt)} ${position.debtTokenSymbol}`,
         validate: (position: V3PositionSummary, amount: bigint) => assertV3DebtAmount(position, amount, 'repay'),
         prepare: (adapter: V3Adapter, position: V3PositionSummary, amount: bigint, _wallet: Address) =>
           adapter.prepareRepay({
             amount,
             recipientTokenId: position.tokenId,
           }),
-        reviewLine: (amount: bigint) => `Repay: ${formatFrameAmount(amount)} ETH`,
+        reviewLine: (amount: bigint) => `Repay: ${formatFrameAmount(amount)} MYT`,
         successLine: 'Your repay transaction was sent.',
       };
     case 'burn':
@@ -259,17 +259,23 @@ function getPositionActionConfig(action: PositionActionName) {
         title: 'Burn',
         accent: '#a855f7',
         buttonLabel: 'Burn',
-        limitLine: (position: V3PositionSummary) => `Current debt: ${formatFrameAmount(position.debt)} ETH`,
+        limitLine: (position: V3PositionSummary) => `Current debt: ${formatFrameAmount(position.debt)} ${position.debtTokenSymbol}`,
         validate: (position: V3PositionSummary, amount: bigint) => assertV3DebtAmount(position, amount, 'burn'),
         prepare: (adapter: V3Adapter, position: V3PositionSummary, amount: bigint, _wallet: Address) =>
           adapter.prepareBurn({
             amount,
             recipientTokenId: position.tokenId,
           }),
-        reviewLine: (amount: bigint) => `Burn: ${formatFrameAmount(amount)} ETH`,
+        reviewLine: (amount: bigint) => `Burn: ${formatFrameAmount(amount)} debt tokens`,
         successLine: 'Your burn transaction was sent.',
       };
   }
+}
+
+function getPositionActionInputDecimals(action: PositionActionName): number {
+  return action === 'withdraw' || action === 'repay'
+    ? v3Config.mytDecimals
+    : v3Config.debtTokenDecimals;
 }
 
 async function renderPositionActionFrame(c: FrameContext, action: PositionActionName) {
@@ -313,7 +319,7 @@ async function renderPositionActionFrame(c: FrameContext, action: PositionAction
       return c.res({
         image: renderCard(`${config.title} Position #${position.tokenId.toString()}`, [
           config.limitLine(position),
-          `Current debt: ${formatFrameAmount(position.debt)} ETH`,
+          `Current debt: ${formatFrameAmount(position.debt)} ${position.debtTokenSymbol}`,
           'Enter an amount to continue.',
         ], config.accent),
         intents: [
@@ -326,7 +332,7 @@ async function renderPositionActionFrame(c: FrameContext, action: PositionAction
       });
     }
 
-    const amount = parseV3AmountInput(amountInput, `${config.title} amount`);
+    const amount = parseV3AmountInput(amountInput, `${config.title} amount`, getPositionActionInputDecimals(action));
     config.validate(position, amount);
     const actionPath = `/frames/position/${action}?tokenId=${position.tokenId.toString()}`;
     const txTarget = `/frames/transactions/${action}?tokenId=${position.tokenId.toString()}&amount=${encodeURIComponent(amountInput)}`;
@@ -369,7 +375,11 @@ async function handlePositionTransaction(c: TransactionContext, action: Position
   try {
     const wallet = parseV3Recipient(c.address, 'Transaction wallet');
     const tokenIdParam = getSearchParam(c, 'tokenId');
-    const amount = parseV3AmountInput(getSearchParam(c, 'amount') ?? c.inputText, `${getPositionActionConfig(action).title} amount`);
+    const amount = parseV3AmountInput(
+      getSearchParam(c, 'amount') ?? c.inputText,
+      `${getPositionActionConfig(action).title} amount`,
+      getPositionActionInputDecimals(action),
+    );
     const position = await getOwnedV3Position(wallet, tokenIdParam);
     const config = getPositionActionConfig(action);
     config.validate(position, amount);
@@ -614,13 +624,13 @@ app.frame('/frames/deposit', (c) => {
   }
 
   try {
-    const amount = parseV3AmountInput(amountInput, 'Deposit amount');
+    const amount = parseV3AmountInput(amountInput, 'Deposit amount', v3Config.underlyingDecimals);
     const viewerAddress = getFrameAddress(c.frameData?.address);
     const depositTarget = `/frames/transactions/deposit?amount=${encodeURIComponent(amountInput)}`;
 
     return c.res({
       image: renderCard('Review Deposit', [
-        `Amount: ${formatFrameAmount(amount)} ETH`,
+        `Amount: ${formatFrameAmount(amount, v3Config.underlyingDecimals)} ${v3Config.baseAssetSymbol}`,
         viewerAddress
           ? `Wallet: ${shortenAddress(viewerAddress)}`
           : 'Wallet is resolved from the signing transaction.',
@@ -691,9 +701,10 @@ app.frame('/frames/dashboard', async (c) => {
       image: renderCard('My Positions', [
         `Wallet: ${shortenAddress(viewerAddress)}`,
         `Viewing #${position.tokenId.toString()} (${index + 1}/${positions.length})`,
-        `Collateral: ${formatFrameAmount(position.collateral)}`,
-        `Debt: ${formatFrameAmount(position.debt)}`,
-        `Available credit: ${formatFrameAmount(position.availableCredit)}`,
+        `Market: ${position.marketLabel}`,
+        `Collateral: ${formatFrameAmount(position.collateral)} MYT`,
+        `Debt: ${formatFrameAmount(position.debt)} ${position.debtTokenSymbol}`,
+        `Available credit: ${formatFrameAmount(position.availableCredit)} ${position.debtTokenSymbol}`,
         `Health: ${formatHealthFactor(position.healthFactor)} (${position.healthState})`,
       ]),
       intents: [
@@ -751,9 +762,10 @@ app.frame('/frames/position', async (c) => {
 
     return c.res({
       image: renderCard(`Position #${position.tokenId.toString()}`, [
-        `Collateral: ${formatFrameAmount(position.collateral)} · Earmarked: ${formatFrameAmount(position.earmarked)}`,
-        `Debt: ${formatFrameAmount(position.debt)}`,
-        `Credit: ${formatFrameAmount(position.availableCredit)} · Max withdraw: ${formatFrameAmount(position.maxWithdrawable)}`,
+        `Market: ${position.marketLabel}`,
+        `Collateral: ${formatFrameAmount(position.collateral)} MYT · Earmarked: ${formatFrameAmount(position.earmarked)} ${position.debtTokenSymbol}`,
+        `Debt: ${formatFrameAmount(position.debt)} ${position.debtTokenSymbol}`,
+        `Credit: ${formatFrameAmount(position.availableCredit)} ${position.debtTokenSymbol} · Max withdraw: ${formatFrameAmount(position.maxWithdrawable)} MYT`,
         `Health: ${formatHealthFactor(position.healthFactor)} (${position.healthState})`,
       ]),
       intents: [
@@ -846,8 +858,8 @@ app.frame('/frames/position/self-liquidate', async (c) => {
     return c.res({
       image: renderCard('Review Self-Liquidation', [
         `Position: #${position.tokenId.toString()}`,
-        `Current debt: ${formatFrameAmount(position.debt)}`,
-        `Collateral: ${formatFrameAmount(position.collateral)}`,
+        `Current debt: ${formatFrameAmount(position.debt)} ${position.debtTokenSymbol}`,
+        `Collateral: ${formatFrameAmount(position.collateral)} MYT`,
         'Collateral repays debt. Remainder returns to your wallet.',
       ], '#f97316'),
       intents: [
@@ -876,7 +888,11 @@ app.frame('/frames/position/self-liquidate', async (c) => {
 
 app.transaction('/frames/transactions/deposit', async (c) => {
   try {
-    const amount = parseV3AmountInput(getSearchParam(c, 'amount') ?? c.inputText, 'Deposit amount');
+    const amount = parseV3AmountInput(
+      getSearchParam(c, 'amount') ?? c.inputText,
+      'Deposit amount',
+      v3Config.underlyingDecimals,
+    );
     const recipient = parseV3Recipient(c.address, 'Transaction wallet');
     const adapter = getServerV3Adapter();
     const tx = await adapter.prepareDeposit({

@@ -2,7 +2,7 @@
  * Core types for CastAlchemy
  */
 
-export type Network = 'ethereum' | 'sepolia';
+export type Network = 'ethereum';
 
 export interface TransactionResult {
   success: boolean;

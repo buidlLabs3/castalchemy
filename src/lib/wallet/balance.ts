@@ -25,12 +25,14 @@ export async function fetchBalance(address: Address, provider?: EthProvider): Pr
       return formatted;
     }
 
-    // Fallback to public RPC - try multiple endpoints
+    // Fallback to public Ethereum Mainnet RPC endpoints.
     const rpcUrls = [
-      'https://rpc.sepolia.org',
-      'https://ethereum-sepolia.publicnode.com',
-      'https://sepolia.gateway.tenderly.co',
-    ];
+      process.env.NEXT_PUBLIC_ALCHEMIX_V3_MAINNET_RPC_URL,
+      process.env.NEXT_PUBLIC_ALCHEMIX_V3_RPC_URL,
+      process.env.ETHEREUM_RPC_URL,
+      'https://eth.llamarpc.com',
+      'https://ethereum-rpc.publicnode.com',
+    ].filter((rpcUrl): rpcUrl is string => !!rpcUrl);
 
     for (const rpcUrl of rpcUrls) {
       try {

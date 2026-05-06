@@ -3,12 +3,15 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { formatEther, type Address } from 'viem';
+import { formatUnits, type Address } from 'viem';
 import styles from './page.module.css';
 import {
   canUseContractV3,
   getV3ChainMetadata,
+  getV3Config,
+  getSupportedV3Markets,
   SUPPORTED_V3_CHAIN_IDS,
+  useSelectedV3MarketId,
   useSelectedV3ChainId,
   useV3Positions,
   useV3ProtocolState,
@@ -16,8 +19,8 @@ import {
 import { fetchBalance } from '@/lib/wallet/balance';
 import { useWallet } from '@/lib/wallet/hooks';
 
-function formatTokenAmount(value: bigint): string {
-  return Number.parseFloat(formatEther(value)).toFixed(4);
+function formatTokenAmount(value: bigint, decimals = 18): string {
+  return Number.parseFloat(formatUnits(value, decimals)).toFixed(4);
 }
 
 function formatHealth(value: number): string {
@@ -47,7 +50,10 @@ export default function MiniApp() {
   const [balanceError, setBalanceError] = useState<string | null>(null);
 
   const { selectedChainId, setSelectedChainId } = useSelectedV3ChainId();
+  const { selectedMarketId, setSelectedMarketId } = useSelectedV3MarketId();
   const chain = getV3ChainMetadata(selectedChainId);
+  const market = getV3Config(selectedChainId, selectedMarketId);
+  const markets = getSupportedV3Markets(selectedChainId);
   const {
     address,
     isConnected,
@@ -63,16 +69,16 @@ export default function MiniApp() {
     isLoading: positionsLoading,
     error: positionsError,
     reload: reloadPositions,
-  } = useV3Positions(address, selectedChainId);
+  } = useV3Positions(address, selectedChainId, selectedMarketId);
   const {
     protocolState,
     isLoading: protocolLoading,
     error: protocolError,
     reload: reloadProtocol,
-  } = useV3ProtocolState(selectedChainId);
+  } = useV3ProtocolState(selectedChainId, selectedMarketId);
 
   const primaryPosition = positions[0] ?? null;
-  const v3Ready = canUseContractV3(selectedChainId);
+  const v3Ready = canUseContractV3(selectedChainId, selectedMarketId);
   const protocolPaused = !!protocolState && (protocolState.depositsPaused || protocolState.loansPaused);
   const protocolStatus = !v3Ready
     ? 'Needs addresses'
@@ -82,8 +88,8 @@ export default function MiniApp() {
         ? 'Loading'
         : 'Operational';
   const readinessCopy = v3Ready
-    ? 'Contract reads and transaction prep are available for this network.'
-    : 'RPC is present, but real Alchemix V3 Alchemist, NFT, Transmuter, debt, and underlying addresses are still missing.';
+    ? `Contract reads and transaction prep are available for ${market.marketLabel}.`
+    : 'Verified Mainnet V3 contracts are in the app; set a Mainnet RPC URL to enable reads and transactions.';
   const walletSummary = isConnecting
     ? 'Checking wallet'
     : isConnected && address
@@ -181,6 +187,7 @@ export default function MiniApp() {
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>CastAlchemy</span>
                 <span className={styles.networkBadge}>{chain.shortLabel}</span>
+                <span className={styles.networkBadge}>{market.marketLabel}</span>
                 <span className={v3Ready ? styles.readyBadge : styles.warningBadge}>
                   {v3Ready ? 'Live V3' : 'V3 not configured'}
                 </span>
@@ -188,7 +195,7 @@ export default function MiniApp() {
               <h1 className={styles.heroTitle}>CastAlchemy</h1>
               <p className={styles.heroSubtitle}>
                 A Farcaster command surface for Alchemix V3 vaults, borrowing, repayment,
-                and position health on Ethereum mainnet or Sepolia.
+                and position health on verified Ethereum mainnet markets.
               </p>
             </div>
             <div className={styles.heroWallet}>
@@ -221,6 +228,20 @@ export default function MiniApp() {
                       : 'No wallet selected'}
                 </span>
               </div>
+              <label className={styles.field}>
+                <span>Market</span>
+                <select
+                  value={selectedMarketId}
+                  onChange={(event) => setSelectedMarketId(event.target.value)}
+                  className={styles.input}
+                >
+                  {markets.map((option) => (
+                    <option key={option.marketId} value={option.marketId}>
+                      {option.marketLabel}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 
@@ -276,8 +297,8 @@ export default function MiniApp() {
                 <div className={styles.gridTwo}>
                   <div className={styles.infoTile}>
                     <span className={styles.infoLabel}>Production networks</span>
-                    <strong>Mainnet and Sepolia only</strong>
-                    <p>All wallet and frame transaction paths are constrained to Ethereum mainnet or Sepolia.</p>
+                    <strong>Ethereum Mainnet</strong>
+                    <p>Only verified public V3 Mainnet deployments are exposed here until Alchemix publishes testnet addresses.</p>
                   </div>
                   <div className={styles.infoTile}>
                     <span className={styles.infoLabel}>Protocol scope</span>
@@ -350,7 +371,7 @@ export default function MiniApp() {
 
             {!v3Ready && (
               <div className={styles.callout}>
-                <strong>{chain.shortLabel} V3 needs real contract addresses</strong>
+                <strong>{chain.shortLabel} V3 needs a Mainnet RPC URL</strong>
                 <span>{readinessCopy}</span>
               </div>
             )}
@@ -388,13 +409,13 @@ export default function MiniApp() {
                     <div className={styles.gridTwo}>
                       <div className={styles.infoTile}>
                         <span className={styles.infoLabel}>Collateral</span>
-                        <strong>{formatTokenAmount(primaryPosition.collateral)}</strong>
-                        <p>Debt: {formatTokenAmount(primaryPosition.debt)}</p>
+                        <strong>{formatTokenAmount(primaryPosition.collateral, market.mytDecimals)} MYT</strong>
+                        <p>Debt: {formatTokenAmount(primaryPosition.debt, market.debtTokenDecimals)} {market.debtTokenSymbol}</p>
                       </div>
                       <div className={styles.infoTile}>
                         <span className={styles.infoLabel}>Available credit</span>
-                        <strong>{formatTokenAmount(primaryPosition.availableCredit)}</strong>
-                        <p>Max withdraw: {formatTokenAmount(primaryPosition.maxWithdrawable)}</p>
+                        <strong>{formatTokenAmount(primaryPosition.availableCredit, market.debtTokenDecimals)} {market.debtTokenSymbol}</strong>
+                        <p>Max withdraw: {formatTokenAmount(primaryPosition.maxWithdrawable, market.mytDecimals)} MYT</p>
                       </div>
                     </div>
                   </div>
@@ -417,13 +438,13 @@ export default function MiniApp() {
                   <div className={styles.gridTwo}>
                     <div className={styles.infoTile}>
                       <span className={styles.infoLabel}>Deposited</span>
-                      <strong>{formatTokenAmount(protocolState.totalDeposited)}</strong>
-                      <p>Underlying value: {formatTokenAmount(protocolState.totalUnderlyingValue)}</p>
+                      <strong>{formatTokenAmount(protocolState.totalDeposited, market.mytDecimals)} MYT</strong>
+                      <p>Underlying value: {formatTokenAmount(protocolState.totalUnderlyingValue, market.underlyingDecimals)} {market.baseAssetSymbol}</p>
                     </div>
                     <div className={styles.infoTile}>
                       <span className={styles.infoLabel}>Debt</span>
-                      <strong>{formatTokenAmount(protocolState.totalDebt)}</strong>
-                      <p>Deposit cap: {formatTokenAmount(protocolState.depositCap)}</p>
+                      <strong>{formatTokenAmount(protocolState.totalDebt, market.debtTokenDecimals)} {market.debtTokenSymbol}</strong>
+                      <p>Deposit cap: {formatTokenAmount(protocolState.depositCap, market.mytDecimals)} MYT</p>
                     </div>
                   </div>
                 ) : (

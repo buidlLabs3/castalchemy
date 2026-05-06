@@ -5,7 +5,7 @@ import {
   type Address,
   type Chain,
 } from 'viem';
-import { alchemistV3PositionNftAbi, alchemistV3ReadAbi, alchemistV3WriteAbi } from './abi';
+import { alchemistV3PositionNftAbi, alchemistV3ReadAbi, alchemistV3RouterAbi, alchemistV3WriteAbi } from './abi';
 import { canUseContractV3, getV3Config, v3Config } from './config';
 import type {
   PrepareBurnParams,
@@ -60,8 +60,8 @@ class ContractV3Adapter implements V3Adapter {
   private publicClient: ReturnType<typeof createPublicClient> | null = null;
 
   private assertReady() {
-    if (!canUseContractV3(this.config.chainId)) {
-      throw new Error(`Configure the Alchemix V3 variables and RPC URL for chain ${this.config.chainId} before calling the V3 adapter.`);
+    if (!canUseContractV3(this.config.chainId, this.config.marketId)) {
+      throw new Error(`Configure the Alchemix V3 RPC URL for ${this.config.marketLabel} on chain ${this.config.chainId} before calling the V3 adapter.`);
     }
   }
 
@@ -134,6 +134,10 @@ class ContractV3Adapter implements V3Adapter {
     const healthFactor = calculateHealthFactor(collateralValue, debt);
 
     return {
+      marketId: this.config.marketId,
+      marketLabel: this.config.marketLabel,
+      baseAssetSymbol: this.config.baseAssetSymbol,
+      debtTokenSymbol: this.config.debtTokenSymbol,
       tokenId,
       owner: resolvedOwner,
       collateral,
@@ -150,7 +154,7 @@ class ContractV3Adapter implements V3Adapter {
   }
 
   isReady(): boolean {
-    return canUseContractV3(this.config.chainId);
+    return canUseContractV3(this.config.chainId, this.config.marketId);
   }
 
   async getPositions(owner: Address): Promise<V3PositionSummary[]> {
@@ -243,13 +247,35 @@ class ContractV3Adapter implements V3Adapter {
       throw new Error('Deposit amount must be greater than zero.');
     }
 
+    const borrowAmount = params.borrowAmount ?? 0n;
+    if (borrowAmount < 0n) {
+      throw new Error('Borrow amount cannot be negative.');
+    }
+
+    const tokenId = params.recipientId ?? 0n;
+    const minSharesOut = params.minSharesOut ?? 0n;
+    const deadline = params.deadline ?? BigInt(Math.floor(Date.now() / 1000) + 20 * 60);
+
+    if (this.config.usesNativeEth) {
+      return {
+        chainId: this.config.chainId,
+        to: this.config.routerAddress,
+        data: encodeFunctionData({
+          abi: alchemistV3RouterAbi,
+          functionName: 'depositETH',
+          args: [tokenId, borrowAmount, minSharesOut, deadline],
+        }),
+        value: params.amount,
+      };
+    }
+
     return {
       chainId: this.config.chainId,
-      to: this.config.alchemistAddress,
+      to: this.config.routerAddress,
       data: encodeFunctionData({
-        abi: alchemistV3WriteAbi,
-        functionName: 'deposit',
-        args: [params.amount, params.recipient, params.recipientId ?? 0n],
+        abi: alchemistV3RouterAbi,
+        functionName: 'depositUnderlying',
+        args: [tokenId, params.amount, borrowAmount, minSharesOut, deadline],
       }),
       value: 0n,
     };
@@ -343,15 +369,16 @@ class ContractV3Adapter implements V3Adapter {
   }
 }
 
-const adapters = new Map<number, V3Adapter>();
+const adapters = new Map<string, V3Adapter>();
 
-export function getV3Adapter(chainId: number = v3Config.chainId): V3Adapter {
-  const config = getV3Config(chainId);
-  let adapter = adapters.get(config.chainId);
+export function getV3Adapter(chainId: number = v3Config.chainId, marketId: string = v3Config.marketId): V3Adapter {
+  const config = getV3Config(chainId, marketId);
+  const adapterKey = `${config.chainId}:${config.marketId}`;
+  let adapter = adapters.get(adapterKey);
 
   if (!adapter) {
     adapter = new ContractV3Adapter(config);
-    adapters.set(config.chainId, adapter);
+    adapters.set(adapterKey, adapter);
   }
 
   return adapter;

@@ -37,7 +37,7 @@ const LESSONS: Omit<EducationLesson, 'totalSteps'>[] = [
     bullets: [
       'Transmuter redemptions convert alAssets back to the underlying asset over a fixed term.',
       'The health bar matters before borrowing, withdrawing, or routing social funds.',
-      'Use Sepolia for testing and mainnet only after contract addresses are verified.',
+      'Use only verified Alchemix V3 deployments; Sepolia is hidden until official addresses are published.',
     ],
     actionLabel: 'Review Borrow',
   },

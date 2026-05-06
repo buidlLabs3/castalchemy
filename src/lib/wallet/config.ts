@@ -1,20 +1,18 @@
 /**
  * Wallet configuration for Farcaster + WalletConnect
- * Supports Ethereum Mainnet (production) and Sepolia (testing).
+ * Supports the verified Ethereum Mainnet V3 deployment.
  */
 import { http, createConfig } from 'wagmi';
-import { mainnet, sepolia } from 'wagmi/chains';
+import { mainnet } from 'wagmi/chains';
 import { injected, walletConnect } from 'wagmi/connectors';
-import { V3_MAINNET_CHAIN_ID, V3_TESTNET_CHAIN_ID } from '@/lib/v3/config';
+import { V3_MAINNET_CHAIN_ID } from '@/lib/v3/config';
 
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || '471d16ca38bb523b158cef3957cbfa7d';
 
-// Primary chain is determined by V3 config
-const configuredChainId = Number(process.env.NEXT_PUBLIC_ALCHEMIX_V3_CHAIN_ID || V3_MAINNET_CHAIN_ID);
-const v3ChainId = configuredChainId === V3_TESTNET_CHAIN_ID ? V3_TESTNET_CHAIN_ID : V3_MAINNET_CHAIN_ID;
+const v3ChainId = V3_MAINNET_CHAIN_ID;
 
 export const config = createConfig({
-  chains: [mainnet, sepolia],
+  chains: [mainnet],
   connectors: [
     injected({ target: 'metaMask' }),
     walletConnect({ projectId }),
@@ -31,16 +29,8 @@ export const config = createConfig({
         retryDelay: 1000,
       },
     ),
-    [sepolia.id]: http(
-      process.env.NEXT_PUBLIC_ALCHEMIX_V3_SEPOLIA_RPC_URL || process.env.SEPOLIA_RPC_URL || 'https://rpc.sepolia.org',
-      {
-        batch: true,
-        retryCount: 3,
-        retryDelay: 1000,
-      },
-    ),
   },
 });
 
-export { mainnet, sepolia };
+export { mainnet };
 export const V3_CHAIN_ID = v3ChainId;
