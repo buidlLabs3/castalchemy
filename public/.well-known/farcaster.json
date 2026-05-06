@@ -21,8 +21,8 @@
     "ogTitle": "CastAlchemy",
     "ogDescription": "Alchemix V3 on Farcaster.",
     "ogImageUrl": "https://castalchemy.vercel.app/api/miniapp-image",
-    "tags": ["alchemix", "defi", "ethereum", "sepolia", "wallet"],
-    "requiredChains": ["eip155:1", "eip155:11155111"],
+    "tags": ["alchemix", "defi", "ethereum", "wallet"],
+    "requiredChains": ["eip155:1"],
     "requiredCapabilities": ["wallet.getEthereumProvider"],
     "canonicalDomain": "castalchemy.vercel.app"
   },

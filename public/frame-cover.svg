@@ -17,8 +17,8 @@
   <rect x="86" y="82" width="1028" height="466" rx="28" fill="#0f172a" stroke="#1f2937" stroke-width="2" />
   <text x="140" y="215" fill="#fbbf24" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700">CastAlchemy</text>
   <text x="140" y="285" fill="#e5e7eb" font-family="Arial, Helvetica, sans-serif" font-size="30">Self-repaying loans on Farcaster</text>
-  <text x="140" y="340" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="24">Wallet, frames, and testnet transaction flows in one app.</text>
+  <text x="140" y="340" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="24">Wallet, frames, and verified Mainnet transaction flows in one app.</text>
   <rect x="140" y="404" width="286" height="62" rx="14" fill="url(#accent)" />
   <text x="184" y="445" fill="#0f172a" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700">Open Mini App</text>
-  <text x="140" y="515" fill="#64748b" font-family="Arial, Helvetica, sans-serif" font-size="22">Sepolia testnet preview</text>
+  <text x="140" y="515" fill="#64748b" font-family="Arial, Helvetica, sans-serif" font-size="22">Ethereum Mainnet V3</text>
 </svg>
