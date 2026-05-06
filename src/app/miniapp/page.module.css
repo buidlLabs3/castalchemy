@@ -9,19 +9,57 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
+}
+
+/* ── Navigation ─────────────────────────────────────── */
+
+.topNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.topNavItem,
+.topNavItemActive {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 13px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 650;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.topNavItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+}
+
+.topNavItemActive {
+  background: var(--brand-muted);
+  color: var(--brand-strong);
 }
 
 /* ── Hero ───────────────────────────────────────────── */
 
 .hero {
-  padding: 24px;
+  padding: 22px;
   border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(245, 192, 154, 0.08), rgba(114, 224, 178, 0.03) 52%, rgba(245, 192, 154, 0)),
+    linear-gradient(135deg, rgba(245, 192, 154, 0.07), rgba(114, 224, 178, 0.035) 52%, rgba(245, 192, 154, 0)),
     var(--surface-raised);
   border: 1px solid var(--border);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
 }
 
 .heroRow {
@@ -40,6 +78,8 @@
 
 .brandBadge,
 .networkBadge,
+.readyBadge,
+.warningBadge,
 .inlineChip {
   display: inline-flex;
   align-items: center;
@@ -61,6 +101,16 @@
   color: var(--muted);
 }
 
+.readyBadge {
+  background: rgba(74, 222, 128, 0.12);
+  color: #6ee7a8;
+}
+
+.warningBadge {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
+}
+
 .heroTitle {
   margin: 0;
   font-size: 28px;
@@ -80,15 +130,23 @@
 
 .heroWallet {
   flex-shrink: 0;
-  min-width: 200px;
+  min-width: 220px;
   padding: 14px 16px;
   border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   font-size: 13px;
+}
+
+.heroWalletStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }
 
 /* ── Labels ─────────────────────────────────────────── */
@@ -113,7 +171,7 @@
 /* ── Metrics row ────────────────────────────────────── */
 
 .metrics {
-  margin-top: 20px;
+  margin-top: 18px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
@@ -127,6 +185,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-height: 86px;
 }
 
 .metricCard strong {
@@ -213,7 +272,7 @@
 }
 
 .actionGrid {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 10px;
 }
 
@@ -262,14 +321,41 @@
 }
 
 .accountCard {
-  background: var(--surface-raised);
+  background:
+    linear-gradient(135deg, rgba(245, 192, 154, 0.045), rgba(255, 255, 255, 0.02)),
+    var(--surface-raised);
   border: 1px solid var(--border);
-  padding: 16px;
+  padding: 14px;
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
+  gap: 14px;
+  align-items: center;
   border-radius: 8px;
+}
+
+.accountIdentity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.accountAvatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-muted);
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.accountMeta {
+  min-width: 0;
 }
 
 .accountLabel {
@@ -284,8 +370,8 @@
 
 .accountAddress {
   display: block;
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: 0;
   color: var(--ink-strong);
 }
@@ -296,10 +382,14 @@
   font-size: 13px;
 }
 
+.accountButtons {
+  justify-content: flex-end;
+}
+
 /* ── Action cards ───────────────────────────────────── */
 
 .actionCard {
-  padding: 16px;
+  padding: 16px 15px;
   border-radius: 8px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -401,7 +491,8 @@ button.listCard:hover {
 .segment,
 .segmentActive,
 .iconButton {
-  padding: 8px 14px;
+  min-height: 34px;
+  padding: 8px 12px;
 }
 
 .primaryButton {
@@ -679,6 +770,7 @@ button.listCard:hover {
   .heroRow,
   .accountCard {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .heroWallet {
@@ -701,7 +793,12 @@ button.listCard:hover {
   .walletActions,
   .accountButtons,
   .dualActionRow {
-    flex-direction: column;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .accountButtons > button {
+    flex: 1 1 auto;
   }
 
   .walletConnect {
@@ -710,5 +807,22 @@ button.listCard:hover {
 
   .heroTitle {
     font-size: 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topNav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topNavItem,
+  .topNavItemActive {
+    width: 100%;
+  }
+
+  .accountButtons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

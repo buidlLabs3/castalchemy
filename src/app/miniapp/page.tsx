@@ -32,6 +32,14 @@ function shortenAddress(address?: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+const navigationItems = [
+  { label: 'Dashboard', href: '/miniapp' },
+  { label: 'Vaults', href: '/miniapp/v3' },
+  { label: 'Mixed Yield', href: '/miniapp/analytics' },
+  { label: 'Learn', href: '/miniapp/learn' },
+  { label: 'Social', href: '/miniapp/social' },
+] as const;
+
 export default function MiniApp() {
   const [copied, setCopied] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);
@@ -64,7 +72,18 @@ export default function MiniApp() {
   } = useV3ProtocolState(selectedChainId);
 
   const primaryPosition = positions[0] ?? null;
+  const v3Ready = canUseContractV3(selectedChainId);
   const protocolPaused = !!protocolState && (protocolState.depositsPaused || protocolState.loansPaused);
+  const protocolStatus = !v3Ready
+    ? 'Needs addresses'
+    : protocolPaused
+      ? 'Paused'
+      : protocolLoading
+        ? 'Loading'
+        : 'Operational';
+  const readinessCopy = v3Ready
+    ? 'Contract reads and transaction prep are available for this network.'
+    : 'RPC is present, but real Alchemix V3 Alchemist, NFT, Transmuter, debt, and underlying addresses are still missing.';
   const walletSummary = isConnecting
     ? 'Checking wallet'
     : isConnected && address
@@ -144,30 +163,35 @@ export default function MiniApp() {
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
+        <nav className={styles.topNav} aria-label="Mini app navigation">
+          {navigationItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={item.href === '/miniapp' ? styles.topNavItemActive : styles.topNavItem}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
         <section className={styles.hero}>
           <div className={styles.heroRow}>
             <div>
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>CastAlchemy</span>
                 <span className={styles.networkBadge}>{chain.shortLabel}</span>
-                <span className={styles.networkBadge}>{canUseContractV3(selectedChainId) ? 'Live V3' : 'V3 not configured'}</span>
+                <span className={v3Ready ? styles.readyBadge : styles.warningBadge}>
+                  {v3Ready ? 'Live V3' : 'V3 not configured'}
+                </span>
               </div>
-              <h1 className={styles.heroTitle}>Alchemix V3 from Farcaster</h1>
+              <h1 className={styles.heroTitle}>CastAlchemy</h1>
               <p className={styles.heroSubtitle}>
-                A focused command surface for deposits, borrowing, repayment, and position health on
-                Ethereum mainnet or Sepolia.
+                A Farcaster command surface for Alchemix V3 vaults, borrowing, repayment,
+                and position health on Ethereum mainnet or Sepolia.
               </p>
             </div>
             <div className={styles.heroWallet}>
-              <span className={styles.walletLabel}>Active wallet</span>
-              <strong>{walletSummary}</strong>
-              <span className={styles.walletHint}>
-                {walletMode === 'farcaster'
-                  ? 'Farcaster wallet'
-                  : walletMode === 'external'
-                    ? 'External wallet'
-                    : 'No wallet selected'}
-              </span>
               <label className={styles.field}>
                 <span>Network</span>
                 <select
@@ -186,6 +210,17 @@ export default function MiniApp() {
                   })}
                 </select>
               </label>
+              <div className={styles.heroWalletStatus}>
+                <span className={styles.walletLabel}>Wallet</span>
+                <strong>{walletSummary}</strong>
+                <span className={styles.walletHint}>
+                  {walletMode === 'farcaster'
+                    ? 'Farcaster wallet'
+                    : walletMode === 'external'
+                      ? 'Browser wallet'
+                      : 'No wallet selected'}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -197,10 +232,8 @@ export default function MiniApp() {
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Protocol</span>
-              <strong>{protocolPaused ? 'Paused' : protocolLoading ? 'Loading' : 'Operational'}</strong>
-              <span className={styles.metricFoot}>
-                {protocolState ? 'State loaded from V3 adapter' : 'Awaiting state'}
-              </span>
+              <strong>{protocolStatus}</strong>
+              <span className={styles.metricFoot}>{readinessCopy}</span>
             </div>
             <div className={styles.metricCard}>
               <span className={styles.metricLabel}>Positions</span>
@@ -269,31 +302,36 @@ export default function MiniApp() {
               </div>
 
               <div className={styles.accountCard}>
-                <div>
-                  <span className={styles.accountLabel}>{walletMode === 'farcaster' ? 'Farcaster' : 'External'}</span>
-                  <strong className={styles.accountAddress}>{shortenAddress(address)}</strong>
-                  <p className={styles.accountSubtle}>
-                    {balanceLoading
-                      ? 'Refreshing balance...'
-                      : balanceError
-                        ? balanceError
-                        : balance
-                          ? `${balance} ETH available`
-                          : 'Balance not loaded yet'}
-                  </p>
+                <div className={styles.accountIdentity}>
+                  <div className={styles.accountAvatar}>{shortenAddress(address).slice(2, 4)}</div>
+                  <div className={styles.accountMeta}>
+                    <span className={styles.accountLabel}>
+                      {walletMode === 'farcaster' ? 'Farcaster wallet' : 'Browser wallet'}
+                    </span>
+                    <strong className={styles.accountAddress}>{shortenAddress(address)}</strong>
+                    <p className={styles.accountSubtle}>
+                      {balanceLoading
+                        ? 'Refreshing balance...'
+                        : balanceError
+                          ? balanceError
+                          : balance
+                            ? `${balance} ETH available`
+                            : 'Balance not loaded yet'}
+                    </p>
+                  </div>
                 </div>
                 <div className={styles.accountButtons}>
                   <button className={styles.secondaryButton} onClick={copyAddress}>
-                    {copied ? 'Copied' : 'Copy address'}
+                    {copied ? 'Copied' : 'Copy'}
                   </button>
                   {walletMode !== 'farcaster' && isFarcasterAvailable && (
                     <button className={styles.ghostButton} onClick={switchToFarcaster}>
-                      Farcaster wallet
+                      Farcaster
                     </button>
                   )}
                   {walletMode !== 'external' && (
                     <button className={styles.ghostButton} onClick={switchToExternal}>
-                      External wallet
+                      Browser
                     </button>
                   )}
                   <button className={styles.ghostButton} onClick={disconnect}>
@@ -307,6 +345,13 @@ export default function MiniApp() {
               <div className={styles.callout}>
                 <strong>Data issue</strong>
                 <span>{protocolError ?? positionsError}</span>
+              </div>
+            )}
+
+            {!v3Ready && (
+              <div className={styles.callout}>
+                <strong>{chain.shortLabel} V3 needs real contract addresses</strong>
+                <span>{readinessCopy}</span>
               </div>
             )}
 
@@ -393,29 +438,29 @@ export default function MiniApp() {
               <div className={styles.panelHeader}>
                 <div>
                   <p className={styles.eyebrow}>Navigation</p>
-                  <h2 className={styles.panelTitle}>Focused screens</h2>
+                  <h2 className={styles.panelTitle}>Actions</h2>
                 </div>
               </div>
 
               <div className={styles.actionGrid}>
                 <Link className={styles.actionCard} href="/miniapp/v3?action=deposit">
                   <span className={styles.actionEyebrow}>V3</span>
-                  <strong>Deposit</strong>
-                  <span>Open or add to a tokenId-backed position.</span>
+                  <strong>Get a loan</strong>
+                  <span>Open a V3 position and prepare the first deposit.</span>
                 </Link>
-                <Link className={styles.actionCard} href="/miniapp/v3">
+                <Link className={styles.actionCard} href="/miniapp/v3?action=borrow">
                   <span className={styles.actionEyebrow}>V3</span>
-                  <strong>Manage positions</strong>
-                  <span>Withdraw, borrow, repay, burn, or self-liquidate.</span>
+                  <strong>Borrow</strong>
+                  <span>Mint against available credit on an existing position.</span>
                 </Link>
                 <Link className={styles.actionCard} href="/miniapp/analytics">
-                  <span className={styles.actionEyebrow}>Insights</span>
-                  <strong>Market and alerts</strong>
-                  <span>Review yield snapshots, health alerts, and bot briefings.</span>
+                  <span className={styles.actionEyebrow}>MYT</span>
+                  <strong>Mixed Yield</strong>
+                  <span>Review yield context and position health signals.</span>
                 </Link>
                 <Link className={styles.actionCard} href="/miniapp/learn">
                   <span className={styles.actionEyebrow}>Guide</span>
-                  <strong>Learn Alchemix</strong>
+                  <strong>Learn V3</strong>
                   <span>Read the core V3 concepts without crowding the trading flow.</span>
                 </Link>
                 <Link className={styles.actionCard} href="/miniapp/social">

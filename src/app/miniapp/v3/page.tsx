@@ -20,6 +20,14 @@ import { useWallet } from '@/lib/wallet/hooks';
 
 type V3Action = 'deposit' | 'withdraw' | 'borrow' | 'repay' | 'burn' | 'selfLiquidate';
 
+const navigationItems = [
+  { label: 'Dashboard', href: '/miniapp' },
+  { label: 'Vaults', href: '/miniapp/v3' },
+  { label: 'Mixed Yield', href: '/miniapp/analytics' },
+  { label: 'Learn', href: '/miniapp/learn' },
+  { label: 'Social', href: '/miniapp/social' },
+] as const;
+
 function getExplorerBaseUrl(chainId: number): string {
   return getV3ChainMetadata(chainId).explorerUrl;
 }
@@ -112,7 +120,7 @@ export default function MiniAppV3Page() {
   const v3Live = canUseContractV3(selectedChainId);
   const canSubmitPreparedTx =
     walletMode === 'external' && !!preparedTx && v3Live && preparedTx.to !== ZERO_ADDRESS;
-  const modeLabel = v3Live ? 'Contracts' : 'Not configured';
+  const modeLabel = v3Live ? 'Contracts' : 'Needs addresses';
 
   const walletSummary = isConnecting
     ? 'Checking...'
@@ -387,12 +395,27 @@ export default function MiniAppV3Page() {
   return (
     <main className={styles.page}>
       <div className={styles.shell}>
+        <nav className={styles.topNav} aria-label="Mini app navigation">
+          {navigationItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={item.href === '/miniapp/v3' ? styles.topNavItemActive : styles.topNavItem}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
         <section className={styles.hero}>
           <div className={styles.heroRow}>
             <div>
               <div className={styles.badgeRow}>
                 <span className={styles.brandBadge}>Alchemix V3</span>
                 <span className={styles.networkBadge}>{chain.shortLabel}</span>
+                <span className={v3Live ? styles.readyBadge : styles.warningBadge}>
+                  {v3Live ? 'Live V3' : 'Needs addresses'}
+                </span>
               </div>
               <h1 className={styles.heroTitle}>Manage Positions</h1>
               <p className={styles.heroSubtitle}>
@@ -437,7 +460,7 @@ export default function MiniAppV3Page() {
               <span className={styles.metricLabel}>Mode</span>
               <strong>{modeLabel}</strong>
               <span className={styles.metricFoot}>
-                {v3Live ? 'Live on-chain' : `Set ${chain.shortLabel} contract addresses and RPC URL`}
+                {v3Live ? 'Live on-chain' : `Set real ${chain.shortLabel} V3 contract addresses`}
               </span>
             </div>
             <div className={styles.metricCard}>
@@ -780,7 +803,7 @@ export default function MiniAppV3Page() {
                     </button>
 
                     {!v3Live && (
-                      <p>Configure all V3 contract addresses and an RPC URL to prepare valid calldata.</p>
+                      <p>Real V3 contract addresses are required before this can prepare valid calldata.</p>
                     )}
 
                     {v3Live && !canSubmitPreparedTx && (
